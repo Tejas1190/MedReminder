@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Intake Logs{% endblock %}
+{% block content %}
+<h1 class="text-[32px] font-bold mb-6">Intake Logs</h1>
+<div class="flex flex-col gap-4">
+    {% for log in intake_logs %}
+    <div class="card flex justify-between items-center">
+        <div>
+            <h2 class="text-lg font-bold">{{ log.medication.name }}</h2>
+            <p class="text-[#46a080]">{{ log.date }} | {{ log.status }}</p>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card">No intake logs found.</div>
+    {% endfor %}
+</div>
+{% endblock %} 

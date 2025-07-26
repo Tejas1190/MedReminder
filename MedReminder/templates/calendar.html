@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Calendar{% endblock %}
+{% block content %}
+<div class="card max-w-4xl mx-auto">
+    <h1 class="text-[32px] font-bold mb-6">Calendar</h1>
+    <div class="mb-4">
+        <table class="w-full border-collapse text-center">
+            <thead>
+                <tr>
+                    <th>Mon</th>
+                    <th>Tue</th>
+                    <th>Wed</th>
+                    <th>Thu</th>
+                    <th>Fri</th>
+                    <th>Sat</th>
+                    <th>Sun</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for week in calendar_weeks %}
+                <tr>
+                    {% for day in week %}
+                        <td class="border p-2 align-top min-h-[80px]">
+                            {% if day %}
+                                <div class="font-bold">{{ day.day }}</div>
+                                {% for log in day.intake_logs %}
+                                    {% if log.missed %}
+                                        <div class="bg-red-100 text-red-700 rounded px-1 mt-1 text-xs">Missed: {{ log.medication.name }}</div>
+                                    {% elif log.taken %}
+                                        <div class="bg-green-100 text-green-700 rounded px-1 mt-1 text-xs">Taken: {{ log.medication.name }}</div>
+                                    {% endif %}
+                                {% endfor %}
+                                {% for mood in day.mood_entries %}
+                                    <div class="bg-blue-100 text-blue-700 rounded px-1 mt-1 text-xs">Mood: {{ mood.mood }}</div>
+                                {% endfor %}
+                                {% for appt in day.appointments %}
+                                    <div class="bg-yellow-100 text-yellow-800 rounded px-1 mt-1 text-xs">
+                                        Appointment: {{ appt.doctor_name }} at {{ appt.time|time:'H:i' }}
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="flex gap-4 mt-4" style="gap: 1.5rem;">
+        <a href="{% url 'appointments_add' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">event</span> Add Appointment</a>
+        <a href="{% url 'mood_add' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">mood</span> Add Mood Entry</a>
+        <a href="{% url 'pdf_download' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">download</span> Download PDF</a>
+    </div>
+</div>
+{% endblock %}

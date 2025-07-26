@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Appointments{% endblock %}
+{% block content %}
+<h1 class="text-4xl font-bold text-[var(--text-primary)] mb-8">Your Appointments</h1>
+<div class="flex flex-col gap-4">
+    {% for appt in appointments %}
+    <div class="card flex justify-between items-center">
+        <div>
+            <h2 class="text-lg font-bold">{{ appt.title }}</h2>
+<p class="text-[#46a080]">Doctor: <span class="font-semibold">{{ appt.doctor_name }}</span></p>
+<p class="text-[#46a080]">{{ appt.date }} | {{ appt.time }}</p>
+        </div>
+        <div class="flex flex-col items-end">
+            <a href="{% url 'appointments_edit' appt.id %}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">edit</span> Edit</a>
+            <a href="{% url 'appointments_delete' appt.id %}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500 text-white font-semibold shadow hover:bg-red-700 transition-colors mt-2"><span class="material-icons">delete</span> Delete</a>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card">No appointments found.</div>
+    {% endfor %}
+</div>
+<div class="mt-6 flex justify-start ml-8">
+    <a href="{% url 'appointments_add' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">event</span> Add Appointment</a>
+</div>
+{% endblock %} 

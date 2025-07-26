@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block title %}Geofencing{% endblock %}
+{% block content %}
+<div class="card max-w-4xl mx-auto">
+    <h1 class="text-[32px] font-bold mb-6">Geofencing</h1>
+    <div class="flex justify-end mb-4">
+        <form method="post" action="{% url 'geofencing:toggle_geofencing' %}">
+            {% csrf_token %}
+            {% if user.geofencing_enabled %}
+                <button type="submit" class="btn btn-warning">Disable Geofencing</button>
+            {% else %}
+                <button type="submit" class="btn btn-success">Enable Geofencing</button>
+            {% endif %}
+        </form>
+    </div>
+    <div class="mb-6">
+        <h2 class="text-xl font-semibold mb-2">Your Geofence Zones</h2>
+        {% if geofences %}
+        <table class="w-full border text-left mb-4">
+            <thead>
+                <tr>
+                    <th class="p-2">Name</th>
+                    <th class="p-2">Latitude</th>
+                    <th class="p-2">Longitude</th>
+                    <th class="p-2">Radius (m)</th>
+                    <th class="p-2">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for zone in geofences %}
+                <tr>
+                    <td class="p-2">{{ zone.name }}</td>
+                    <td class="p-2">{{ zone.latitude }}</td>
+                    <td class="p-2">{{ zone.longitude }}</td>
+                    <td class="p-2">{{ zone.radius_meters }}</td>
+                    <td class="p-2">
+                        <form method="post" action="{% url 'geofencing:geofencing_delete' zone.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-gray-500 mb-4">No geofence zones defined yet.</div>
+        {% endif %}
+    </div>
+    <div class="mb-4">
+        <!-- Geofencing map or info here -->
+        <div id="map" style="width:100%;height:400px;"></div>
+    </div>
+    <form method="post" action="{% url 'geofencing:geofencing_add' %}" class="flex gap-4 mt-4">
+        {% csrf_token %}
+        <input type="text" name="name" placeholder="Zone Name" required class="px-4 py-2 rounded-lg border border-green-200 bg-white font-semibold text-[var(--text-secondary)] hover:bg-green-50 transition-colors text-center" />
+        <input type="hidden" name="latitude" id="latitude" />
+        <input type="hidden" name="longitude" id="longitude" />
+        <input type="number" name="radius_meters" placeholder="Radius (m)" required class="px-4 py-2 rounded-lg border border-green-200 bg-white font-semibold text-[var(--text-secondary)] hover:bg-green-50 transition-colors text-center" />
+        <button type="submit" class="btn btn-success">Add Geofence</button>
+        <span id="location-helper" class="text-gray-500 text-sm ml-2">Click on the map to select location</span>
+    </form>
+</div>
+{% endblock %}
+{% block scripts %}
+{% include 'leaflet_includes.html' %}
+<script>
+function haversineDistance(lat1, lon1, lat2, lon2) {
+    function toRad(x) { return x * Math.PI / 180; }
+    var R = 6371000; // meters
+    var dLat = toRad(lat2 - lat1);
+    var dLon = toRad(lon2 - lon1);
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+var geofences = [
+    {% for zone in geofences %}
+    {
+        name: "{{ zone.name|escapejs }}",
+        lat: parseFloat("{{ zone.latitude }}"),
+        lng: parseFloat("{{ zone.longitude }}"),
+        radius: parseFloat("{{ zone.radius_meters|default:100 }}")
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
+
+function checkGeofence(position) {
+    var userLat = position.coords.latitude;
+    var userLng = position.coords.longitude;
+    var insideAny = false;
+    for (var i = 0; i < geofences.length; i++) {
+        var zone = geofences[i];
+        var dist = haversineDistance(userLat, userLng, zone.lat, zone.lng);
+        if (dist <= zone.radius) {
+            insideAny = true;
+            break;
+        }
+    }
+    if (!insideAny && geofences.length > 0) {
+        alert('You have left your geofence zone!');
+    }
+}
+
+function monitorGeofence() {
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(checkGeofence, function(err) {}, {enableHighAccuracy:true, maximumAge:10000, timeout:10000});
+    }
+}
+
+function initMap() {
+    var map = L.map('map').setView([28.6139, 77.2090], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: ' OpenStreetMap contributors'
+    }).addTo(map);
+    // Add geofence circles
+    geofences.forEach(function(zone) {
+        L.circle([zone.lat, zone.lng], {
+            color: '#FF0000',
+            fillColor: '#FF0000',
+            fillOpacity: 0.2,
+            radius: zone.radius
+        }).addTo(map).bindPopup(zone.name + ' (' + zone.radius + 'm)');
+    });
+    // Optionally add user marker if geolocation available
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            var userMarker = L.marker([position.coords.latitude, position.coords.longitude]).addTo(map);
+            userMarker.bindPopup('Your Location').openPopup();
+            map.setView([position.coords.latitude, position.coords.longitude], 14);
+        });
+    }
+    // Add click handler for new geofence
+    var newMarker = null;
+    map.on('click', function(e) {
+        var lat = e.latlng.lat.toFixed(6);
+        var lng = e.latlng.lng.toFixed(6);
+        document.getElementById('latitude').value = lat;
+        document.getElementById('longitude').value = lng;
+        if (newMarker) { map.removeLayer(newMarker); }
+        newMarker = L.marker([lat, lng]).addTo(map).bindPopup('New Geofence Location').openPopup();
+    });
+}
+window.onload = function() {
+    initMap();
+    {% if user.geofencing_enabled %}
+    monitorGeofence();
+    {% endif %}
+};
+</script>
+{% endblock %}

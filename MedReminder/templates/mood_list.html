@@ -1,0 +1,27 @@
+
+{% extends 'base.html' %}
+{% block title %}Mood History{% endblock %}
+{% block content %}
+<h1 class="text-4xl font-bold text-[var(--text-primary)] mb-8">Your Mood History</h1>
+<div class="flex flex-col gap-4">
+    {% for mood in moods %}
+    <div class="card flex justify-between items-center">
+        <div>
+            <h2 class="text-lg font-bold">{{ mood.date }}</h2>
+            <p class="text-[#46a080]">{{ mood.mood }}</p>
+        </div>
+        <div class="flex gap-4" style="gap: 1.5rem;">
+            <a href="{% url 'meds:mood_edit' mood.id %}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">edit</span> Edit</a>
+            <a href="{% url 'meds:mood_delete' mood.id %}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500 text-white font-semibold shadow hover:bg-red-700 transition-colors"><span class="material-icons">delete</span> Delete</a>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card">No mood entries found.</div>
+    {% endfor %}
+</div>
+<div class="mt-8 flex justify-start ml-8">
+    <a href="{% url 'meds:mood_add' %}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors">
+        <span class="material-icons">mood</span> Add Mood Entry
+    </a>
+</div>
+{% endblock %} 

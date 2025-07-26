@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+    <h1 class="text-4xl font-bold text-[var(--text-primary)]">Your Medications</h1>
+    <a href="{% url 'meds:meds_add' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors">
+        <span class="material-icons">add</span> Add Medication
+    </a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    {% for med in medications %}
+    <div class="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-4 min-w-[320px]">
+        <div class="flex items-start justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-[var(--text-primary)]">{{ med.name }}</h2>
+                <div class="text-[var(--text-secondary)] text-sm font-medium">{{ med.dosage }}{% if med.frequency %}, {{ med.frequency }}{% endif %}</div>
+            </div>
+            <div class="flex gap-2">
+                <a href="{% url 'meds:meds_edit' med.id %}" class="hover:text-[var(--primary-color)]"><span class="material-icons">edit</span></a>
+                <a href="{% url 'meds:meds_delete' med.id %}" class="hover:text-[var(--accent-color)]"><span class="material-icons">delete</span></a>
+            </div>
+        </div>
+        <div class="bg-[var(--secondary-color)] rounded-xl p-4 flex items-center gap-4">
+            <span class="material-icons text-2xl text-[var(--primary-color)]">alarm</span>
+            <div>
+                <span class="font-bold text-[var(--text-primary)]">Next Dose: {{ med.next_dose_time|default:'--' }}</span><br>
+                <span class="text-[var(--text-secondary)] text-sm">{{ med.next_dose_note|default:'' }}</span>
+            </div>
+        </div>
+        <a href="{% url 'meds:schedules_list' med.id %}" class="px-4 py-2 rounded-lg border border-green-200 bg-white font-semibold text-[var(--text-secondary)] hover:bg-green-50 transition-colors text-center">Manage Schedule</a>
+    </div>
+    {% empty %}
+    <div class="col-span-full text-center text-[var(--text-secondary)]">No medications found.</div>
+    {% endfor %}
+</div>
+{% endblock %}

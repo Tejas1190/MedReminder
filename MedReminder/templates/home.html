@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MedReminder - Medication Reminder</title>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&family=Lexend:wght@400;500;700;900&family=Noto+Sans:wght@400;500;700;900" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style type="text/tailwindcss">
+        :root {
+            --primary-color: #10b981;--secondary-color: #ecfdf5;--background-color: #f0fdf4;--text-primary: #064e3b;--text-secondary: #047857;--accent-color: #f43f5e;--sos-color: #ef4444;
+            --sos-background: #fee2e2;
+        }
+        body {
+            font-family: 'Lexend', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+        }
+        .feature_card {
+            @apply bg-white rounded-xl shadow-lg p-6 flex flex-col items-center justify-center text-center hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 ease-in-out cursor-pointer;
+        }
+        .feature_icon {
+            @apply text-4xl text-[var(--primary-color)] mb-4;
+        }
+        .feature_text {
+            @apply text-lg font-semibold text-[var(--text-primary)];
+        }
+    </style>
+</head>
+<body class="bg-[var(--background-color)]">
+<div class="relative flex size-full min-h-screen flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-green-200 px-10 py-4 bg-white shadow-sm">
+<div class="flex items-center gap-3 text-[var(--text-primary)]">
+<div class="text-[var(--primary-color)]">
+<svg class="h-8 w-8" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h1 class="text-2xl font-bold tracking-tight">MedReminder</h1>
+</div>
+<div class="flex items-center gap-6">
+<nav class="flex items-center gap-6 text-sm font-medium text-[var(--text-secondary)]">
+<a class="hover:text-[var(--primary-color)] transition-colors" href="/">Home</a>
+<a class="hover:text-[var(--primary-color)] transition-colors" href="/support/">Support</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="relative">
+<span class="material-icons text-gray-600 hover:text-[var(--primary-color)] transition-colors">notifications</span>
+<span class="absolute top-0 right-0 h-2 w-2 rounded-full bg-[var(--accent-color)]"></span>
+</button>
+<img alt="User avatar" class="h-10 w-10 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA42drP78SR2IZLFu5XkXvFcDkK_vV0qDIGNUV5OOLed27l6Zm8ZtKTz1fZfUkE9yMFthumlePemPRjuj0AweYvSv_-TYmslxeehRgb_SO95BfzQXviFgJT7wjS6soID5AY95GS590byoTen_prZetnB2raCP8SXesisCpeGYyFjJATlJRzrdhl8J2IkTjZXMiKG6u9hCEcGUQniwW6dCkogFQ9zkdSDCwQibe8zFLlX3059mIH1maXuHpphDs10_jc3q93-tk7jjuq"/>
+</div>
+</div>
+</header>
+<main class="flex-1 px-4 sm:px-6 lg:px-8 py-12">
+<div class="max-w-6xl mx-auto">
+<div class="mb-12 text-center">
+<h2 class="text-5xl font-bold text-[var(--text-primary)] tracking-tighter">Welcome back, {{ user.first_name|default:user.username }}!</h2>
+<p class="mt-4 text-xl text-[var(--text-secondary)]">How can we help you today?</p>
+</div>
+<div class="flex justify-center">
+  <div class="grid grid-cols-3 gap-8 w-full max-w-2xl">
+    <a href="/meds/" class="feature_card">
+      <span class="material-icons feature_icon">medication</span>
+      <span class="feature_text">Medications</span>
+    </a>
+    <a href="/appointments/" class="feature_card">
+      <span class="material-icons feature_icon">event</span>
+      <span class="feature_text">Appointments</span>
+    </a>
+    <a href="/calendar/" class="feature_card">
+      <span class="material-icons feature_icon">calendar_today</span>
+      <span class="feature_text">Calendar</span>
+    </a>
+    <a href="/mood/" class="feature_card">
+      <span class="material-icons feature_icon">sentiment_very_satisfied</span>
+      <span class="feature_text">Mood Tracker</span>
+    </a>
+    <a href="/geofencing/" class="feature_card">
+      <span class="material-icons feature_icon">location_on</span>
+      <span class="feature_text">Geofencing</span>
+    </a>
+    <a href="/chat/" class="feature_card">
+      <span class="material-icons feature_icon">chat</span>
+      <span class="feature_text">Chatbot</span>
+    </a>
+  </div>
+</div>
+<div class="mt-16 flex justify-center">
+<a href="/logout/" class="flex items-center gap-2 px-8 py-3 rounded-full bg-white text-[var(--text-secondary)] hover:bg-green-50 transition-colors font-semibold shadow-md hover:shadow-lg border border-green-200">
+<span class="material-icons">logout</span>
+Logout
+</a>
+</div>
+</div>
+</main>
+</div>
+</div>
+
+</body>
+</html>

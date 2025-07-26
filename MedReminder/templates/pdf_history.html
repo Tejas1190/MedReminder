@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}PDF History{% endblock %}
+{% block content %}
+<div class="card max-w-4xl mx-auto">
+    <h1 class="text-[32px] font-bold mb-6">PDF History</h1>
+    <ul>
+        {% for log in pdfs %}
+        <li>
+            <strong>{{ log.medication.name }}</strong> — {{ log.scheduled_time|date:'Y-m-d H:i' }} — {% if log.taken %}Taken{% else %}Missed{% endif %}
+            {% if log.notes %}<br><em>Notes: {{ log.notes }}</em>{% endif %}
+        </li>
+        {% empty %}
+        <li>No medication intake logs found.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

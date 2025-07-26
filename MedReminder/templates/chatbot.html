@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block title %}Chatbot{% endblock %}
+{% block content %}
+<div class="flex flex-col h-[80vh] max-h-[80vh] justify-between">
+    <div class="flex-1 flex flex-col p-4 md:p-8 overflow-hidden">
+        <div id="chatbox" class="flex-1 overflow-y-auto space-y-6 pr-2">
+            {% for message in chat_history %}
+                {% if message.sender == 'bot' %}
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-[var(--primary-color)] flex items-center justify-center text-white">
+                        <span class="material-icons">smart_toy</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <div class="bg-white rounded-r-xl rounded-bl-xl p-4 shadow-sm">
+                            <p class="text-md text-[var(--text-primary)]">{{ message.message }}</p>
+                        </div>
+                        <span class="text-xs text-gray-500 mt-1 ml-1">{{ message.timestamp|date:'h:i A' }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="flex items-start gap-4 justify-end">
+                    <div class="flex flex-col items-end">
+                        <div class="bg-[var(--primary-color)] text-white rounded-l-xl rounded-br-xl p-4 shadow-sm">
+                            <p class="text-md">{{ message.message }}</p>
+                        </div>
+                        <span class="text-xs text-gray-500 mt-1 mr-1">{{ message.timestamp|date:'h:i A' }}</span>
+                    </div>
+                    <div class="flex items-center justify-center h-10 w-10 rounded-full bg-[var(--primary-color)] text-white font-bold text-lg">
+    {{ user.first_name|default:user.username|slice:":1"|upper }}
+</div>
+                </div>
+                {% endif %}
+            {% empty %}
+                <div class="text-gray-400 text-center">No messages yet. Say hello!</div>
+            {% endfor %}
+        </div>
+        <form id="chat-form" method="post" class="mt-auto w-full flex items-center gap-4 px-0">
+            {% csrf_token %}
+            <input id="chat-input" type="text" name="message" placeholder="Type your message..." autocomplete="off" class="flex-1 px-4 py-3 border border-green-200 rounded-full focus:ring-2 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] transition-shadow"/>
+            <button type="submit" class="flex items-center justify-center h-12 w-12 rounded-full bg-[var(--primary-color)] text-white hover:bg-emerald-600 transition-colors shadow-md hover:shadow-lg">
+                <span class="material-icons">send</span>
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    const chatbox = document.getElementById('chatbox');
+    const userAvatarUrl = "{{ user.avatar_url|default:'/static/img/default-avatar.png' }}";
+
+    function formatTime(date) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    chatForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        console.log('Form submitted');
+        const msg = chatInput.value.trim();
+        if (!msg) return;
+        const now = new Date();
+        chatbox.innerHTML += `
+        <div class="flex items-start gap-4 justify-end">
+            <div class="flex flex-col items-end">
+                <div class="bg-[var(--primary-color)] text-white rounded-l-xl rounded-br-xl p-4 shadow-sm">
+                    <p class="text-md">${msg}</p>
+                </div>
+                <span class="text-xs text-gray-500 mt-1 mr-1">${formatTime(now)}</span>
+            </div>
+            <img alt="User avatar" class="h-10 w-10 rounded-full object-cover" src="${userAvatarUrl}"/>
+        </div>`;
+        chatbox.scrollTop = chatbox.scrollHeight;
+        chatInput.value = '';
+        fetch('/chat/chat/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({message: msg})
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(`HTTP ${response.status}: ${text}`); });
+            }
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                return response.text().then(text => { throw new Error(`Expected JSON but got ${contentType}: ${text}`); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            const nowBot = new Date();
+            chatbox.innerHTML += `
+            <div class=\"flex items-start gap-4\">\n            <div class=\"flex-shrink-0 h-10 w-10 rounded-full bg-[var(--primary-color)] flex items-center justify-center text-white\">\n                <span class=\"material-icons\">smart_toy</span>\n            </div>\n            <div class=\"flex flex-col\">\n                <div class=\"bg-white rounded-r-xl rounded-bl-xl p-4 shadow-sm\">\n                    <p class=\"text-md text-[var(--text-primary)]\">${data.bot}</p>\n                </div>\n                <span class=\"text-xs text-gray-500 mt-1 ml-1\">${formatTime(nowBot)}</span>\n            </div>\n        </div>`;
+            chatbox.scrollTop = chatbox.scrollHeight;
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            const nowErr = new Date();
+            chatbox.innerHTML += `
+            <div class="flex items-start gap-4">
+                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-red-500 flex items-center justify-center text-white">
+                    <span class="material-icons">error</span>
+                </div>
+                <div class="flex flex-col">
+                    <div class="bg-white rounded-r-xl rounded-bl-xl p-4 shadow-sm">
+                        <p class="text-md text-[var(--text-primary)]">Error: ${error.message}</p>
+                    </div>
+                    <span class="text-xs text-gray-500 mt-1 ml-1">${formatTime(nowErr)}</span>
+                </div>
+            </div>`;
+            chatbox.scrollTop = chatbox.scrollHeight;
+        });
+    });
+});
+</script>
+{% endblock %}

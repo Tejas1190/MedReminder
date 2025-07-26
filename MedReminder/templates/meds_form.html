@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block title %}Add Medication{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8 mt-8">
+    <h1 class="text-3xl font-bold text-[var(--text-primary)] mb-8">Add Medication</h1>
+    <form method="post" class="space-y-8">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+        <div class="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+            {% for error in form.non_field_errors %}{{ error }}<br>{% endfor %}
+        </div>
+    {% endif %}
+        <div>
+            <label class="block text-lg font-semibold text-[var(--text-primary)] mb-2" for="id_name">Medication Name</label>
+            {{ form.name }}
+            {% for error in form.name.errors %}<div class="text-red-600">{{ error }}</div>{% endfor %}
+        </div>
+        <div>
+            <label class="block text-lg font-semibold text-[var(--text-primary)] mb-2" for="id_instructions">Dosage Instructions</label>
+            {{ form.instructions }}
+            {% for error in form.instructions.errors %}<div class="text-red-600">{{ error }}</div>{% endfor %}
+        </div>
+        <div>
+            <label class="block text-lg font-semibold text-[var(--text-primary)] mb-2" for="id_inventory_count">Inventory</label>
+            {{ form.inventory_count }}
+            {% for error in form.inventory_count.errors %}<div class="text-red-600">{{ error }}</div>{% endfor %}
+        </div>
+        <div>
+            <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-4">Schedule</h3>
+            <div class="flex flex-col gap-6">
+                <div class="flex items-center justify-between gap-4 flex-wrap">
+                    <span class="text-md font-medium text-[var(--text-secondary)]">Days of the week:</span>
+                    <div class="flex gap-2 flex-wrap">
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="S">S</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="M">M</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="T">T</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="W">W</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="T2">T</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="F">F</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="S2">S</button>
+</div>
+                </div>
+                <div class="flex items-center gap-4 mt-4">
+                    <label class="text-md font-medium text-[var(--text-secondary)]" for="id_time">Time:</label>
+                    <input type="time" name="time" id="id_time" class="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] transition-shadow" />
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-end gap-4 pt-6 border-t border-gray-200">
+            <a href="{% url 'meds:meds_list' %}" class="px-8 py-3 rounded-full text-lg font-semibold text-[var(--text-secondary)] bg-gray-100 hover:bg-gray-200 transition-colors">Cancel</a>
+            <button type="submit" class="px-8 py-3 rounded-full text-lg font-semibold text-white bg-[var(--primary-color)] hover:bg-emerald-600 transition-colors shadow-md hover:shadow-lg">Save</button>
+        </div>
+        <input type="hidden" name="days_of_week" id="days_of_week" />
+        <input type="hidden" name="schedule_time" id="schedule_time" />
+    </form>
+</div>
+<script>
+    // Day-of-week button selection logic
+    const dayButtons = document.querySelectorAll('.days-of-week-btn');
+    const daysOfWeekInput = document.getElementById('days_of_week');
+    let selectedDays = [];
+    dayButtons.forEach((btn, i) => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const day = btn.dataset.day;
+            btn.classList.toggle('bg-[var(--secondary-color)]');
+            btn.classList.toggle('text-[var(--primary-color)]');
+            btn.classList.toggle('border-[var(--primary-color)]');
+            if (selectedDays.includes(day)) {
+                selectedDays = selectedDays.filter(d => d !== day);
+            } else {
+                selectedDays.push(day);
+            }
+            daysOfWeekInput.value = selectedDays.join(',');
+        });
+    });
+    // Time input logic
+    const timeInput = document.getElementById('id_time');
+    const scheduleTimeInput = document.getElementById('schedule_time');
+    if (timeInput) {
+        timeInput.addEventListener('change', function() {
+            scheduleTimeInput.value = timeInput.value;
+        });
+    }
+    // On submit, ensure values are set
+    document.querySelector('form').addEventListener('submit', function() {
+        daysOfWeekInput.value = selectedDays.join(',');
+        scheduleTimeInput.value = timeInput.value;
+    });
+</script>
+{% endblock %}

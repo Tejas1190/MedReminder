@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedReminder</title>
+    <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&family=Lexend:wght@400;500;700;900&family=Noto+Sans:wght@400;500;700;900" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style type="text/tailwindcss">
+:root {
+    --primary-color: #10b981;
+    --secondary-color: #ecfdf5;
+    --background-color: #f0fdf4;
+    --text-primary: #064e3b;
+    --text-secondary: #047857;
+    --accent-color: #f43f5e;
+    --sos-color: #ef4444;
+}
+body {
+    font-family: 'Lexend', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-primary);
+}
+</style>
+    <link rel="stylesheet" href="/static/css/elder.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#1976d2">
+    {% block head %}{% endblock %}
+</head>
+<body>
+{% if user.is_authenticated %}
+<!-- Header (always at the top) -->
+<header class="flex items-center border-b border-solid border-green-200 px-10 py-4 bg-white shadow-sm w-full z-20">
+    <div class="flex items-center gap-3 text-[var(--text-primary)]">
+        <h1 class="text-2xl font-bold tracking-tight">{% block header_title %}MedReminder{% endblock %}</h1>
+    </div>
+    <div class="flex flex-1 items-center justify-between ml-8">
+        <div class="flex items-center gap-8 ml-auto">
+    <button class="relative">
+        <span class="material-icons text-gray-600 hover:text-[var(--primary-color)] transition-colors">notifications</span>
+        <span class="absolute top-0 right-0 h-2 w-2 rounded-full bg-[var(--accent-color)]"></span>
+    </button>
+    <a class="hover:text-[var(--primary-color)] transition-colors text-sm font-medium text-[var(--text-secondary)]" href="/">Home</a>
+    {% if not pdf_mode %}<img alt="User avatar" class="h-10 w-10 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA42drP78SR2IZLFu5XkXvFcDkK_vV0qDIGNUV5OOLed27l6Zm8ZtKTz1fZfUkE9yMFthumlePemPRjuj0AweYvSv_-TYmslxeehRgb_SO95BfzQXviFgJT7wjS6soID5AY95GS590byoTen_prZetnB2raCP8SXesisCpeGYyFjJATlJRzrdhl8J2IkTjZXMiKG6u9hCEcGUQniwW6dCkogFQ9zkdSDCwQibe8zFLlX3059mIH1maXuHpphDs10_jc3q93-tk7jjuq"/>{% endif %}
+</div>
+        </div>
+    </div>
+</header>
+<div class="flex min-h-screen">
+
+    <!-- Sidebar -->
+    <aside class="w-64 min-h-screen bg-white border-r border-green-100 flex flex-col py-8 px-4">
+        <div class="flex items-center gap-3 mb-12">
+            <span class="material-icons text-[var(--primary-color)] text-3xl">add_circle</span>
+            <span class="font-bold text-xl text-[var(--text-primary)]">PillPal</span>
+        </div>
+        <nav class="flex flex-col gap-2 text-[var(--text-secondary)] font-semibold">
+    <a href="/meds/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/meds/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">medication</span> Medications
+    </a>
+    <a href="/appointments/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/appointments/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">event_note</span> Appointments
+    </a>
+    <a href="/calendar/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/calendar/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">calendar_today</span> Calendar
+    </a>
+    <a href="/mood/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/mood/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">mood</span> Mood Tracker
+    </a>
+    <a href="/geofencing/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/geofencing/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">my_location</span> Geofencing
+    </a>
+    <a href="/chat/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/chat/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">smart_toy</span> Chatbot
+    </a>
+    {% if user.role == 'caregiver' %}
+    <a href="/dashboard/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/dashboard/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">supervisor_account</span> Caregiver Dashboard
+    </a>
+    {% endif %}
+    {% if user.is_superuser %}
+    <a href="/admin/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors">
+        <span class="material-icons">admin_panel_settings</span> Admin
+    </a>
+    {% endif %}
+</nav>
+        <div class="mt-auto flex flex-col gap-4">
+            <div class="flex items-center gap-2">
+                {% if not pdf_mode %}<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuA42drP78SR2IZLFu5XkXvFcDkK_vV0qDIGNUV5OOLed27l6Zm8ZtKTz1fZfUkE9yMFthumlePemPRjuj0AweYvSv_-TYmslxeehRgb_SO95BfzQXviFgJT7wjS6soID5AY95GS590byoTen_prZetnB2raCP8SXesisCpeGYyFjJATlJRzrdhl8J2IkTjZXMiKG6u9hCEcGUQniwW6dCkogFQ9zkdSDCwQibe8zFLlX3059mIH1maXuHpphDs10_jc3q93-tk7jjuq" alt="User avatar" class="h-8 w-8 rounded-full object-cover">{% endif %}
+                <span class="font-sans font-semibold text-base text-[var(--text-secondary)]">{{ user.first_name|default:user.username }}</span>
+            </div>
+            <form method="post" action="{% url 'accounts:logout' %}" class="mt-2">
+    {% csrf_token %}
+    <button type="submit" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors text-[var(--text-secondary)] w-full text-left">
+        <span class="material-icons">logout</span> Logout
+    </button>
+</form>
+        </div>
+    </aside>
+    <main class="flex-1 px-4 sm:px-6 lg:px-8 py-12 pt-24">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+{% else %}
+    <div class="min-h-screen bg-gray-50">
+        {% block unauth_content %}{% endblock %}
+    </div>
+{% endif %}
+{% block scripts %}{% endblock %}
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/static/service-worker.js');
+  });
+}
+</script>
+</body>
+</html>

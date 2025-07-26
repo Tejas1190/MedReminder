@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block title %}Reminders{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h1 class="text-[32px] font-bold mb-2">Reminders</h1>
+    <p class="text-[#46a080] text-base mb-8">Manage your upcoming and missed medication reminders.</p>
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-bold">All Schedules for {{ medication.name }}</h2>
+            <a href="{% url 'meds:schedules_add' medication.id %}" class="px-5 py-2 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors">+ Add Schedule</a>
+        </div>
+        <div class="flex flex-col gap-3">
+            {% for schedule in schedules %}
+            <div class="flex items-center gap-4 bg-[#f8fcfa] rounded-xl px-6 py-3 shadow-sm">
+                <div class="flex-1">
+                    <span class="font-bold">Time:</span> {{ schedule.time }}<br>
+                    <span class="font-bold">Days:</span> {{ schedule.days_of_week }}
+                </div>
+                <a href="{% url 'meds:schedules_edit' medication.id schedule.id %}" class="btn btn-secondary btn-sm">Edit</a>
+                <a href="{% url 'meds:schedules_delete' medication.id schedule.id %}" class="btn btn-danger btn-sm">Delete</a>
+            </div>
+            {% empty %}
+            <div class="text-gray-400">No schedules found for this medication.</div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="mb-8">
+        <h2 class="text-xl font-bold mb-4">Upcoming</h2>
+        <div class="flex flex-col gap-4">
+            {% for reminder in upcoming_reminders %}
+            <div class="flex items-center justify-between bg-[#f8fcfa] rounded-xl px-6 py-4 shadow-sm">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center justify-center rounded-lg bg-[#e6f4ef] size-12">
+                        <!-- Pill Icon -->
+                        <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M216.42,39.6a53.26,53.26,0,0,0-75.32,0L39.6,141.09a53.26,53.26,0,0,0,75.32,75.31h0L216.43,114.91A53.31,53.31,0,0,0,216.42,39.6ZM103.61,205.09h0a37.26,37.26,0,0,1-52.7-52.69L96,107.31,148.7,160ZM205.11,103.6,160,148.69,107.32,96l45.1-45.09a37.26,37.26,0,0,1,52.69,52.69ZM189.68,82.34a8,8,0,0,1,0,11.32l-24,24a8,8,0,1,1-11.31-11.32l24-24A8,8,0,0,1,189.68,82.34Z"></path></svg>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="font-bold text-lg">{{ reminder.medication.name }}</span>
+                        <span class="text-[#46a080] text-base">{{ reminder.time }}</span>
+                    </div>
+                </div>
+                <label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-[#e6f4ef] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-[#019863]">
+                    <div class="h-full w-[27px] rounded-full bg-white" style="box-shadow: rgba(0, 0, 0, 0.15) 0px 3px 8px, rgba(0, 0, 0, 0.06) 0px 3px 1px;"></div>
+                    <input type="checkbox" class="invisible absolute" {% if reminder.taken %}checked{% endif %} />
+                </label>
+            </div>
+            {% empty %}
+            <div class="text-gray-400">No upcoming reminders.</div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="mb-8">
+        <h2 class="text-xl font-bold mb-4">Missed</h2>
+        <div class="flex flex-col gap-4">
+            {% for reminder in missed_reminders %}
+            <div class="flex items-center justify-between bg-[#f8fcfa] rounded-xl px-6 py-4 shadow-sm">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center justify-center rounded-lg bg-[#e6f4ef] size-12">
+                        <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M216.42,39.6a53.26,53.26,0,0,0-75.32,0L39.6,141.09a53.26,53.26,0,0,0,75.32,75.31h0L216.43,114.91A53.31,53.31,0,0,0,216.42,39.6ZM103.61,205.09h0a37.26,37.26,0,0,1-52.7-52.69L96,107.31,148.7,160ZM205.11,103.6,160,148.69,107.32,96l45.1-45.09a37.26,37.26,0,0,1,52.69,52.69ZM189.68,82.34a8,8,0,0,1,0,11.32l-24,24a8,8,0,1,1-11.31-11.32l24-24A8,8,0,0,1,189.68,82.34Z"></path></svg>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="font-bold text-lg">{{ reminder.medication.name }}</span>
+                        <span class="text-[#46a080] text-base">{{ reminder.time }}</span>
+                    </div>
+                </div>
+                <span class="text-[#46a080] text-base font-medium">Missed</span>
+            </div>
+            {% empty %}
+            <div class="text-gray-400">No missed reminders.</div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="mb-8">
+        <h2 class="text-xl font-bold mb-4">Alert Settings</h2>
+        <form class="flex flex-col gap-6 max-w-lg">
+            <div>
+                <label class="block font-medium mb-2">Alert Sound</label>
+                <select class="form-input w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-[#0c1c17] focus:outline-0 focus:ring-0 border border-[#cde9df] bg-[#f8fcfa] focus:border-[#cde9df] h-14 placeholder:text-[#46a080] p-[15px] text-base font-normal leading-normal">
+                    <option value="">Select sound</option>
+                    <option value="one">Sound 1</option>
+                    <option value="two">Sound 2</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-medium mb-2">Alert Frequency</label>
+                <select class="form-input w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-[#0c1c17] focus:outline-0 focus:ring-0 border border-[#cde9df] bg-[#f8fcfa] focus:border-[#cde9df] h-14 placeholder:text-[#46a080] p-[15px] text-base font-normal leading-normal">
+                    <option value="">Select frequency</option>
+                    <option value="one">Once</option>
+                    <option value="two">Twice</option>
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 

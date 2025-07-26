@@ -1,0 +1,2683 @@
+
+
+===== FILE: create_code_txt.py =====
+
+import os
+import sys
+
+# Root directory of the project
+project_root = os.path.dirname(os.path.abspath(__file__))
+output_file = os.path.join(project_root, "code.txt")
+
+exclude_dirs = {'venv', '.git', '__pycache__', 'migrations', 'static', 'media'}
+include_ext = {'.py', '.html', '.js', '.css', '.md'}
+
+try:
+    with open(output_file, 'w', encoding='utf-8') as outfile:
+        for root, dirs, files in os.walk(project_root):
+            # Skip excluded directories
+            dirs[:] = [d for d in dirs if d not in exclude_dirs]
+            
+            for file in files:
+                if any(file.endswith(ext) for ext in include_ext):
+                    file_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(file_path, project_root)
+                    
+                    try:
+                        outfile.write(f"\n\n===== FILE: {rel_path} =====\n\n")
+                        
+                        with open(file_path, 'r', encoding='utf-8') as infile:
+                            outfile.write(infile.read())
+                        
+                        outfile.write("\n")
+                    except Exception as e:
+                        print(f"Error processing {file_path}: {e}", file=sys.stderr)
+    
+    print(f"Successfully created code.txt at {output_file}")
+except Exception as e:
+    print(f"Failed to create code.txt: {e}", file=sys.stderr)
+    sys.exit(1)
+
+
+
+===== FILE: README.md =====
+
+# 🩺 Smart Medication Reminder System
+
+A full-stack Django/PostgreSQL PWA for medication reminders, caregiver dashboards, geofencing, push/SMS notifications, and more.
+
+## Features
+- Add, edit, delete medications
+- Schedule daily reminders
+- Confirm intake with a button
+- Responsive UI (desktop + mobile)
+- Caregiver dashboard
+- Caregiver can edit med schedules remotely
+- Separate logins for caregiver, patient, admin
+- Daily logs, calendar view, mood tracker
+- Push notifications (browser/mobile, fallback to SMS)
+- Panic/SOS button for patient
+- Alerts for repeated missed doses
+- Geofencing for wandering detection
+- PDF download of med history
+- Doctor appointment tracker
+- Meds inventory reminder
+- Simple PWA install
+- AI chatbot for help
+
+## Tech Stack
+- Django, PostgreSQL, Celery, Twilio, ChatterBot, WeasyPrint, Bootstrap, Google Maps API
+
+## Local Setup (Windows)
+
+### 1. Install Requirements
+- Python 3.10+
+- PostgreSQL (download from https://www.postgresql.org/download/)
+- Node.js (for PWA/service worker if needed)
+
+### 2. Clone the Repo & Set Up Virtualenv
+```
+git clone <repo-url>
+cd MedReminderExp
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 3. Configure PostgreSQL
+- Create a database `medreminder_db` and user `postgres` (or update credentials in `settings.py`)
+
+### 4. Set Environment Variables (optional)
+- Create a `.env` file in the project root for Twilio/Google Maps keys if needed
+
+### 5. Run Migrations
+```
+cd MedReminder
+python manage.py makemigrations
+python manage.py migrate
+```
+
+### 6. Create Superuser
+```
+python manage.py createsuperuser
+```
+
+### 7. Start Celery Worker (in a new terminal)
+```
+celery -A MedReminder worker -l info
+```
+
+### 8. Run the Server
+```
+python manage.py runserver
+```
+
+### 9. Access the App
+- Open http://localhost:8000/
+- Admin: http://localhost:8000/admin/
+
+### 10. For PWA
+- Open in Chrome, "Add to Home Screen"
+
+### 11. For Push Notifications
+- Allow notifications in browser/mobile
+
+### 12. Twilio/Google Maps
+- Add your API keys in `.env` or `settings.py` as needed
+
+---
+
+**For any issues, check the README or contact the maintainer.** 
+
+
+===== FILE: MedReminder\manage.py =====
+
+#!/usr/bin/env python
+"""Django's command-line utility for administrative tasks."""
+import os
+import sys
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+
+
+def main():
+    """Run administrative tasks."""
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'MedReminder.settings')
+    try:
+        from django.core.management import execute_from_command_line
+    except ImportError as exc:
+        raise ImportError(
+            "Couldn't import Django. Are you sure it's installed and "
+            "available on your PYTHONPATH environment variable? Did you "
+            "forget to activate a virtual environment?"
+        ) from exc
+    execute_from_command_line(sys.argv)
+
+
+if __name__ == '__main__':
+    main()
+
+
+
+===== FILE: MedReminder\MedReminder\asgi.py =====
+
+"""
+ASGI config for MedReminder project.
+
+It exposes the ASGI callable as a module-level variable named ``application``.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
+"""
+
+import os
+
+from django.core.asgi import get_asgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'MedReminder.settings')
+
+application = get_asgi_application()
+
+
+
+===== FILE: MedReminder\MedReminder\celery.py =====
+
+import os
+from celery import Celery
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'MedReminder.settings')
+
+app = Celery('MedReminder')
+app.config_from_object('django.conf:settings', namespace='CELERY')
+app.autodiscover_tasks() 
+
+
+===== FILE: MedReminder\MedReminder\context_processors.py =====
+
+from django.conf import settings
+
+def vapid_public_key(request):
+    return {'VAPID_PUBLIC_KEY': settings.VAPID_PUBLIC_KEY}
+
+
+
+===== FILE: MedReminder\MedReminder\settings.py =====
+
+"""
+Django settings for MedReminder project.
+
+Generated by 'django-admin startproject' using Django 5.2.4.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/5.2/topics/settings/
+
+For the full list of settings and their values, see
+https://docs.djangoproject.com/en/5.2/ref/settings/
+"""
+
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = 'django-insecure-dqqtsctqlmy-4@adv)gx)oe%@t#(+n99h1s&o(&9irp#$s&r-g'
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.1.10']  # Add your local IP here
+
+
+# Application definition
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'widget_tweaks',
+    'MedReminder.Accounts',
+    'MedReminder.Meds',
+    'MedReminder.Geofencing',
+    'MedReminder.Chat',
+   'django_celery_results',
+   'django_celery_beat',
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+ROOT_URLCONF = 'MedReminder.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+                'MedReminder.context_processors.vapid_public_key',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'MedReminder.wsgi.application'
+
+
+# Database
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+
+DATABASES = {
+    'default': {
+       'ENGINE': 'django.db.backends.sqlite3',
+       'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+
+# Password validation
+# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
+
+
+# Internationalization
+# https://docs.djangoproject.com/en/5.2/topics/i18n/
+
+LANGUAGE_CODE = 'en-us'
+
+TIME_ZONE = 'UTC'
+
+USE_I18N = True
+
+USE_TZ = True
+
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/5.2/howto/static-files/
+
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Twilio and Google Maps API keys (mocked for now)
+TWILIO_ACCOUNT_SID = 'mock_twilio_sid'
+TWILIO_AUTH_TOKEN = 'mock_twilio_token'
+TWILIO_PHONE_NUMBER = '+1234567890'
+GOOGLE_MAPS_API_KEY = 'mock_google_maps_key'
+
+# Web Push VAPID keys
+VAPID_PUBLIC_KEY = os.getenv('VAPID_PUBLIC_KEY')
+VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY')
+VAPID_ADMIN_EMAIL = os.getenv('VAPID_ADMIN_EMAIL')
+
+# Celery Configuration
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6380/0')
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'Asia/Kolkata'
+
+# Default primary key field type
+# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+AUTH_USER_MODEL = 'Accounts.User'
+
+
+
+===== FILE: MedReminder\MedReminder\urls.py =====
+
+"""
+URL configuration for MedReminder project.
+
+The `urlpatterns` list routes URLs to views. For more information please see:
+    https://docs.djangoproject.com/en/5.2/topics/http/urls/
+Examples:
+Function views
+    1. Add an import:  from my_app import views
+    2. Add a URL to urlpatterns:  path('', views.home, name='home')
+Class-based views
+    1. Add an import:  from other_app.views import Home
+    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
+Including another URLconf
+    1. Import the include() function: from django.urls import include, path
+    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+"""
+from django.contrib import admin
+from django.urls import path, include
+from django.contrib.auth import views as auth_views
+from django.shortcuts import redirect
+from MedReminder.Meds import views as meds_views
+from MedReminder.Meds.views import home_view
+from MedReminder.Meds.views import register_push, confirm_intake
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('chat/', include(('MedReminder.Chat.urls', 'chat'), namespace='chat')),
+    path('meds/', include(('MedReminder.Meds.urls', 'meds'), namespace='meds')),
+    path('accounts/', include(('MedReminder.Accounts.urls', 'accounts'), namespace='accounts')),
+    path('login/', lambda request: redirect('/accounts/login/', permanent=True)),
+    path('register/', lambda request: redirect('/accounts/register/', permanent=True)),
+    path('logout/', lambda request: redirect('/accounts/logout/', permanent=True)),
+    # The following are direct view paths, not included in a namespace
+    path('appointments/', meds_views.appointments_list, name='appointments_list'),
+    path('appointments/add/', meds_views.appointments_add, name='appointments_add'),
+    path('appointments/<int:appt_id>/edit/', meds_views.appointments_edit, name='appointments_edit'),
+    path('appointments/<int:appt_id>/delete/', meds_views.appointments_delete, name='appointments_delete'),
+    path('mood/', meds_views.mood_list, name='mood_list'),
+    path('mood/add/', meds_views.mood_add, name='mood_add'),
+    path('mood/<int:entry_id>/edit/', meds_views.mood_edit, name='mood_edit'),
+    # Add geofencing URLs
+    path('geofencing/', include(('MedReminder.Geofencing.urls', 'geofencing'), namespace='geofencing')),
+    path('calendar/', meds_views.calendar_view, name='calendar_view'),
+    path('dashboard/', meds_views.caregiver_dashboard, name='caregiver_dashboard'),
+    path('pdf/', meds_views.pdf_history, name='pdf_history'),
+    path('pdf/download/', meds_views.pdf_download, name='pdf_download'),
+    path('intake_logs/', meds_views.intake_logs_list, name='intake_logs_list'),
+    path('intake_logs/<int:log_id>/confirm/', meds_views.intake_log_confirm, name='intake_log_confirm'),
+    path('', home_view, name='home'),
+    # Add web push notification endpoints
+    path('register-push/', register_push, name='register_push'),
+    path('confirm-intake/', confirm_intake, name='confirm_intake'),
+    path('test-push/', meds_views.test_web_push, name='test_web_push'),
+]
+
+
+
+===== FILE: MedReminder\MedReminder\wsgi.py =====
+
+"""
+WSGI config for MedReminder project.
+
+It exposes the WSGI callable as a module-level variable named ``application``.
+
+For more information on this file, see
+https://docs.djangoproject.com/en/5.2/howto/deployment/wsgi/
+"""
+
+import os
+
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'MedReminder.settings')
+
+application = get_wsgi_application()
+
+
+
+===== FILE: MedReminder\MedReminder\__init__.py =====
+
+from .celery import app as celery_app
+
+__all__ = ('celery_app',)
+
+
+
+
+===== FILE: MedReminder\MedReminder\Accounts\admin.py =====
+
+from django.contrib import admin
+from .models import User
+
+admin.site.register(User) 
+
+
+===== FILE: MedReminder\MedReminder\Accounts\models.py =====
+
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+class User(AbstractUser):
+    PATIENT = 'patient'
+    CAREGIVER = 'caregiver'
+    ADMIN = 'admin'
+    ROLE_CHOICES = [
+        (PATIENT, 'Patient'),
+        (CAREGIVER, 'Caregiver'),
+        (ADMIN, 'Admin'),
+    ]
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=PATIENT)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    geofencing_enabled = models.BooleanField(default=True)
+    # Add more profile fields as needed
+
+    def __str__(self):
+        return f"{self.username} ({self.role})" 
+
+
+===== FILE: MedReminder\MedReminder\Accounts\urls.py =====
+
+from django.urls import path
+from django.contrib.auth import views as auth_views
+from .views import register
+
+urlpatterns = [
+    path('register/', register, name='register'),
+    path('login/', auth_views.LoginView.as_view(template_name='registration/login.html'), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(next_page='/accounts/login/'), name='logout'),
+] 
+
+
+===== FILE: MedReminder\MedReminder\Accounts\views.py =====
+
+from django.shortcuts import render, redirect
+from django.contrib.auth import login
+from .models import User
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib import messages
+
+def register(request):
+    if request.method == 'POST':
+        username = request.POST['username']
+        email = request.POST['email']
+        phone = request.POST['phone']
+        role = request.POST['role']
+        password1 = request.POST['password1']
+        password2 = request.POST['password2']
+        if password1 != password2:
+            messages.error(request, 'Passwords do not match.')
+            return render(request, 'registration/register.html')
+        if User.objects.filter(username=username).exists():
+            messages.error(request, 'Username already exists.')
+            return render(request, 'registration/register.html')
+        user = User.objects.create_user(username=username, email=email, password=password1, role=role, phone=phone)
+        login(request, user)
+        return redirect('meds_list')
+    return render(request, 'registration/register.html') 
+
+
+===== FILE: MedReminder\MedReminder\Accounts\__init__.py =====
+
+# Accounts app package 
+
+
+===== FILE: MedReminder\MedReminder\Chat\admin.py =====
+
+from django.contrib import admin
+from .models import ChatMessage
+
+admin.site.register(ChatMessage) 
+
+
+===== FILE: MedReminder\MedReminder\Chat\models.py =====
+
+from django.db import models
+from django.conf import settings
+
+class ChatMessage(models.Model):
+    USER = 'user'
+    BOT = 'bot'
+    SENDER_CHOICES = [
+        (USER, 'User'),
+        (BOT, 'Bot'),
+    ]
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='chat_messages')
+    sender = models.CharField(max_length=10, choices=SENDER_CHOICES)
+    message = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.sender} at {self.timestamp}: {str(self.message)[:30]}"  # type: ignore 
+
+
+===== FILE: MedReminder\MedReminder\Chat\urls.py =====
+
+from django.urls import path
+from .views import chat_with_bot, chatbot_page
+
+urlpatterns = [
+    path('chat/', chat_with_bot, name='chat_with_bot'),
+    path('', chatbot_page, name='chatbot_page'),
+] 
+
+
+===== FILE: MedReminder\MedReminder\Chat\views.py =====
+
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from .models import ChatMessage
+from django.contrib.auth import get_user_model
+import json
+import os
+import requests
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), '.env'))
+
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
+GROQ_MODEL = os.environ.get('GROQ_MODEL', 'mixtral-8x7b-32768')
+GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
+
+def get_groq_response(user_message):
+    headers = {
+        'Authorization': f'Bearer {GROQ_API_KEY}',
+        'Content-Type': 'application/json',
+    }
+    data = {
+        'model': GROQ_MODEL,
+        'messages': [
+            {'role': 'user', 'content': user_message}
+        ],
+        'max_tokens': 256,
+        'temperature': 0.7,
+    }
+    try:
+        response = requests.post(GROQ_API_URL, headers=headers, json=data, timeout=15)
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content']
+        else:
+            print('Groq API error:', response.status_code, response.text)
+            return f"Groq API error: {response.status_code} - {response.text}"
+    except Exception as e:
+        print('Groq API exception:', str(e))
+        return f"Groq API exception: {str(e)}"
+
+@csrf_exempt
+@login_required
+def chat_with_bot(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        user_message = data.get('message', '')
+        user = request.user
+        # Store user message
+        ChatMessage.objects.create(user=user, sender=ChatMessage.USER, message=user_message)
+        # Get bot response from Groq AI
+        bot_response = get_groq_response(user_message)
+        # Store bot message
+        ChatMessage.objects.create(user=user, sender=ChatMessage.BOT, message=bot_response)
+        return JsonResponse({'user': user_message, 'bot': bot_response})
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+@login_required
+def chatbot_page(request):
+    chat_history = ChatMessage.objects.filter(user=request.user).order_by('timestamp')  # type: ignore
+    return render(request, 'chatbot.html', {'chat_history': chat_history})
+
+
+===== FILE: MedReminder\MedReminder\Geofencing\admin.py =====
+
+from django.contrib import admin
+from .models import GeofenceZone, SOSAlert
+
+admin.site.register(GeofenceZone)
+admin.site.register(SOSAlert) 
+
+
+===== FILE: MedReminder\MedReminder\Geofencing\models.py =====
+
+from django.db import models
+from django.conf import settings
+
+class GeofenceZone(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='geofences')
+    name = models.CharField(max_length=100)
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    radius_meters = models.PositiveIntegerField(default=100)  # type: ignore
+    active = models.BooleanField(default=True)  # type: ignore
+
+    def __str__(self):
+        return f"{self.name} ({self.user.username})"  # type: ignore
+
+class SOSAlert(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sos_alerts')
+    triggered_at = models.DateTimeField(auto_now_add=True)
+    location_lat = models.FloatField(null=True, blank=True)
+    location_lng = models.FloatField(null=True, blank=True)
+    resolved = models.BooleanField(default=False)  # type: ignore
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"SOS by {self.user.username} at {self.triggered_at}"  # type: ignore 
+
+
+===== FILE: MedReminder\MedReminder\Geofencing\urls.py =====
+
+from django.urls import path
+from .views import geofencing_page, geofencing_add, geofencing_delete, toggle_geofencing
+
+urlpatterns = [
+    path('', geofencing_page, name='geofencing_page'),
+    path('add/', geofencing_add, name='geofencing_add'),
+    path('delete/<int:zone_id>/', geofencing_delete, name='geofencing_delete'),
+    path('toggle/', toggle_geofencing, name='toggle_geofencing'),
+] 
+
+
+===== FILE: MedReminder\MedReminder\Geofencing\utils.py =====
+
+
+
+
+===== FILE: MedReminder\MedReminder\Geofencing\views.py =====
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from .models import GeofenceZone
+from django.utils import timezone
+from django.conf import settings
+
+# SOS functionality removed
+
+@login_required
+def geofencing_page(request):
+    geofences = GeofenceZone.objects.filter(user=request.user)  # type: ignore
+    return render(request, 'geofencing.html', {'geofences': geofences, 'GOOGLE_MAPS_API_KEY': settings.GOOGLE_MAPS_API_KEY})
+
+@login_required
+def geofencing_add(request):
+    if request.method == 'POST':
+        GeofenceZone.objects.create(
+            user=request.user,
+            name=request.POST['name'],
+            latitude=request.POST['latitude'],
+            longitude=request.POST['longitude'],
+            radius_meters=request.POST['radius_meters'],
+            active=True
+        )  # type: ignore
+    return redirect('geofencing:geofencing_page')
+
+@login_required
+def geofencing_delete(request, zone_id):
+    zone = get_object_or_404(GeofenceZone, id=zone_id, user=request.user)
+    if request.method == 'POST':
+        zone.delete()
+    return redirect('geofencing:geofencing_page')
+
+@login_required
+def toggle_geofencing(request):
+    user = request.user
+    user.geofencing_enabled = not user.geofencing_enabled
+    user.save()
+    return redirect('geofencing:geofencing_page')
+
+
+
+===== FILE: MedReminder\MedReminder\Meds\admin.py =====
+
+from django.contrib import admin
+from .models import Medication, MedicationSchedule, MedicationIntakeLog, Inventory, MoodTracker, Appointment
+
+admin.site.register(Medication)
+admin.site.register(MedicationSchedule)
+admin.site.register(MedicationIntakeLog)
+admin.site.register(Inventory)
+admin.site.register(MoodTracker)
+admin.site.register(Appointment) 
+
+
+===== FILE: MedReminder\MedReminder\Meds\models.py =====
+
+from django.db import models
+from django.conf import settings
+from django.utils import timezone
+from django.contrib.postgres.fields import ArrayField
+
+class Medication(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='medications')
+    name = models.CharField(max_length=100)
+    dosage = models.CharField(max_length=100)
+    instructions = models.TextField(blank=True)
+    inventory_count = models.PositiveIntegerField(default=0)
+    inventory_threshold = models.PositiveIntegerField(default=5)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.user.username})"
+
+class MedicationSchedule(models.Model):
+    medication = models.ForeignKey(Medication, on_delete=models.CASCADE, related_name='schedules')
+    time = models.TimeField()
+    days_of_week = models.CharField(max_length=20, default='daily')  # e.g., 'Mon,Tue,Wed' or 'daily'
+    caregiver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='caregiver_schedules')
+
+    def __str__(self):
+        return f"{self.medication.name} at {self.time} ({self.days_of_week})"
+
+class MedicationIntakeLog(models.Model):
+    medication = models.ForeignKey(Medication, on_delete=models.CASCADE, related_name='intake_logs')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='intake_logs')
+    scheduled_time = models.DateTimeField()
+    taken = models.BooleanField(default=False)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    missed = models.BooleanField(default=False)
+    mood = models.CharField(max_length=50, blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.medication.name} for {self.user.username} at {self.scheduled_time}"
+
+class Inventory(models.Model):
+    medication = models.OneToOneField(Medication, on_delete=models.CASCADE, related_name='inventory')
+    count = models.PositiveIntegerField(default=0)
+    threshold = models.PositiveIntegerField(default=5)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Inventory for {self.medication.name}: {self.count}"
+
+class MoodTracker(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mood_entries')
+    date = models.DateField()
+    mood = models.PositiveSmallIntegerField()
+    notes = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.date}: {self.mood}"
+
+class WebPushSubscription(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='push_subscriptions')
+    endpoint = models.TextField()
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} subscription"
+
+class Appointment(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='appointments')
+    doctor_name = models.CharField(max_length=100)
+    date = models.DateField()
+    time = models.TimeField()
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Appointment with {self.doctor_name} on {self.date} at {self.time} for {self.user.username}"
+
+
+===== FILE: MedReminder\MedReminder\Meds\tasks.py =====
+
+from celery import shared_task
+from django.utils import timezone
+from django.conf import settings
+from .models import MedicationSchedule, MedicationIntakeLog, WebPushSubscription
+from pywebpush import webpush, WebPushException
+from django.contrib.auth import get_user_model
+from datetime import timedelta
+
+import logging
+import json
+
+logger = logging.getLogger(__name__)
+
+@shared_task
+def send_med_reminder(medication_schedule_id):
+    logger.info(f"Starting send_med_reminder for schedule {medication_schedule_id}")
+    try:
+        schedule = MedicationSchedule.objects.get(id=medication_schedule_id)
+        user = schedule.user
+        medication = schedule.medication
+        logger.info(f"Sending reminder for {medication.name} to user {user.username}")
+        
+        # Create intake log
+        log = MedicationIntakeLog.objects.create(
+            user=user,
+            medication=medication,
+            scheduled_time=timezone.now(),
+            taken=False
+        )
+        logger.info(f"Created intake log {log.id}")
+        
+        # SMS sending removed (Fast2SMS deprecated)
+        if user.phone:
+            pass  # No SMS logic
+        else:
+            logger.warning(f"No phone number for user {user.username}")
+        
+        # Send web push notification
+        subscriptions = WebPushSubscription.objects.filter(user=user)
+        logger.info(f"Found {subscriptions.count()} web push subscriptions for {user.username}")
+        for sub in subscriptions:
+            try:
+                payload = {
+                    'title': 'MedReminder',
+                    'body': f"Take {medication.name}, {medication.dosage}",
+                    'data': {
+                        'log_id': log.id,
+                        'url': f"/confirm-intake/?log_id={log.id}"
+                    }
+                }
+                webpush(
+                    subscription_info={
+                        'endpoint': sub.endpoint,
+                        'keys': {
+                            'p256dh': sub.p256dh,
+                            'auth': sub.auth
+                        }
+                    },
+                    data=json.dumps(payload),
+                    vapid_private_key=settings.VAPID_PRIVATE_KEY,
+                    vapid_claims={
+                        'sub': f'mailto:{settings.VAPID_ADMIN_EMAIL}'
+                    }
+                )
+                logger.info(f"Web push sent to {user.username}")
+            except WebPushException as e:
+                logger.error(f"Failed to send web push to {user.username}: {str(e)}")
+        
+        # Schedule the confirmation notification 10 minutes later
+        from .tasks import send_confirmation_reminder
+        eta = timezone.now() + timedelta(minutes=10)
+        logger.info(f"Scheduling confirmation reminder for log {log.id} at {eta}")
+        send_confirmation_reminder.apply_async(args=[log.id], eta=eta)
+        
+    except MedicationSchedule.DoesNotExist:
+        logger.error(f"MedicationSchedule with id {medication_schedule_id} does not exist")
+
+@shared_task
+def send_test_push(user_id):
+    from django.contrib.auth import get_user_model
+    from .models import WebPushSubscription
+    User = get_user_model()
+    user = User.objects.get(id=user_id)
+    
+    subscriptions = WebPushSubscription.objects.filter(user=user)
+    for sub in subscriptions:
+        try:
+            payload = {
+                'title': 'Test Notification',
+                'body': 'This is a test push from MedReminder!',
+                'data': {'url': '/'}
+            }
+            webpush(
+                subscription_info={
+                    'endpoint': sub.endpoint,
+                    'keys': {'p256dh': sub.p256dh, 'auth': sub.auth}
+                },
+                data=json.dumps(payload),
+                vapid_private_key=settings.VAPID_PRIVATE_KEY,
+                vapid_claims={'sub': f'mailto:{settings.VAPID_ADMIN_EMAIL}'}
+            )
+            logger.info(f"Test push sent to {user.username}")
+        except Exception as e:
+            logger.error(f"Test push failed: {str(e)}")
+
+@shared_task
+def check_missed_doses():
+    User = get_user_model()
+    caregivers = User.objects.filter(role='caregiver')  # type: ignore
+    week_ago = timezone.now() - timedelta(days=7)
+    for caregiver in caregivers:
+        patients = User.objects.filter(role='patient')  # type: ignore
+        for patient in patients:
+            missed_logs = MedicationIntakeLog.objects.filter(user=patient, missed=True, scheduled_time__gte=week_ago)  # type: ignore
+            if missed_logs.count() >= 3:
+                message = f"Alert: {patient.username} has missed {missed_logs.count()} doses in the last 7 days."
+                print(f"Would send web push to {caregiver}: {message}")
+                # Removed Twilio code
+
+
+
+===== FILE: MedReminder\MedReminder\Meds\urls.py =====
+
+from django.urls import path
+from .views import (
+    meds_list, meds_add, meds_edit, meds_delete,
+    schedules_list, schedules_add, schedules_edit, schedules_delete,
+    intake_logs_list, intake_log_confirm,
+    appointments_list, appointments_add, appointments_edit, appointments_delete,
+    mood_list, mood_add, mood_edit, mood_delete,
+    calendar_view,
+    caregiver_dashboard,
+    pdf_history, pdf_download
+)
+
+urlpatterns = [
+    path('', meds_list, name='meds_list'),
+    path('add/', meds_add, name='meds_add'),
+    path('<int:med_id>/edit/', meds_edit, name='meds_edit'),
+    path('<int:med_id>/delete/', meds_delete, name='meds_delete'),
+    path('<int:med_id>/schedules/', schedules_list, name='schedules_list'),
+    path('<int:med_id>/schedules/add/', schedules_add, name='schedules_add'),
+    path('<int:med_id>/schedules/<int:schedule_id>/edit/', schedules_edit, name='schedules_edit'),
+    path('<int:med_id>/schedules/<int:schedule_id>/delete/', schedules_delete, name='schedules_delete'),
+    path('intake_logs/', intake_logs_list, name='intake_logs_list'),
+    path('intake_logs/<int:log_id>/confirm/', intake_log_confirm, name='intake_log_confirm'),
+    path('appointments/', appointments_list, name='appointments_list'),
+    path('appointments/add/', appointments_add, name='appointments_add'),
+    path('appointments/<int:appt_id>/edit/', appointments_edit, name='appointments_edit'),
+    path('appointments/<int:appt_id>/delete/', appointments_delete, name='appointments_delete'),
+    path('mood/', mood_list, name='mood_list'),
+    path('mood/add/', mood_add, name='mood_add'),
+    path('mood/<int:entry_id>/edit/', mood_edit, name='mood_edit'),
+    path('mood/<int:entry_id>/delete/', mood_delete, name='mood_delete'),
+    path('mood/<int:entry_id>/delete/', mood_delete, name='mood_delete'),
+    path('calendar/', calendar_view, name='calendar_view'),
+    path('dashboard/', caregiver_dashboard, name='caregiver_dashboard'),
+    path('pdf/', pdf_history, name='pdf_history'),
+    path('pdf/download/', pdf_download, name='pdf_download'),
+] 
+
+
+===== FILE: MedReminder\MedReminder\Meds\utils.py =====
+
+import requests
+from django.conf import settings
+
+
+
+===== FILE: MedReminder\MedReminder\Meds\views.py =====
+
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from .models import Medication, MedicationSchedule, MedicationIntakeLog, Appointment, MoodTracker
+from django import forms
+from django.utils import timezone
+import calendar
+from datetime import date, timedelta, datetime
+from django.contrib.auth import get_user_model
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from weasyprint import HTML
+
+# Web Push Notification Endpoints
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from .models import WebPushSubscription
+import json
+
+@csrf_exempt
+@login_required
+def register_push(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        sub, created = WebPushSubscription.objects.get_or_create(
+            user=request.user,
+            endpoint=data['endpoint'],
+            defaults={'p256dh': data['keys']['p256dh'], 'auth': data['keys']['auth']}
+        )
+        if not created:
+            sub.p256dh = data['keys']['p256dh']
+            sub.auth = data['keys']['auth']
+            sub.save()
+        return JsonResponse({'status': 'ok'})
+    return JsonResponse({'status': 'error'}, status=400)
+
+@csrf_exempt
+@login_required
+def confirm_intake(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        log_id = data.get('log_id')
+        try:
+            log = MedicationIntakeLog.objects.get(id=log_id, user=request.user)
+            log.taken = True
+            log.confirmed_at = timezone.now()
+            log.save()
+            return JsonResponse({'status': 'confirmed'})
+        except MedicationIntakeLog.DoesNotExist:
+            return JsonResponse({'status': 'not found'}, status=404)
+    return JsonResponse({'status': 'error'}, status=400)
+
+@login_required
+def mood_delete(request, entry_id):
+    entry = get_object_or_404(MoodTracker, id=entry_id, user=request.user)
+    if request.method == 'POST':
+        entry.delete()
+        return redirect('meds:mood_list')
+    return render(request, 'mood_confirm_delete.html', {'mood': entry})
+
+class MedicationForm(forms.ModelForm):
+    class Meta:
+        model = Medication
+        fields = ['name', 'dosage', 'instructions', 'inventory_count']
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] transition-shadow',
+                'placeholder': 'e.g., Metformin'
+            }),
+            'instructions': forms.Textarea(attrs={
+                'class': 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] transition-shadow',
+                'placeholder': 'e.g., 500mg, one tablet with breakfast',
+                'rows': 3
+            }),
+            'inventory_count': forms.NumberInput(attrs={
+                'class': 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] transition-shadow',
+                'placeholder': 'e.g., 90'
+            })
+        }
+
+class MedicationScheduleForm(forms.ModelForm):
+    class Meta:
+        model = MedicationSchedule
+        fields = ['time', 'days_of_week', 'caregiver']
+
+class AppointmentForm(forms.ModelForm):
+    class Meta:
+        model = Appointment
+        fields = ['doctor_name', 'date', 'time', 'notes']
+
+class MoodTrackerForm(forms.ModelForm):
+    class Meta:
+        model = MoodTracker
+        fields = ['date', 'mood', 'notes']
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date'}),
+            'mood': forms.NumberInput(attrs={'min': 1, 'max': 10, 'type': 'number'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk and not self.initial.get('date'):
+            self.initial['date'] = timezone.now().date()
+
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from .models import Medication, MedicationSchedule, MedicationIntakeLog, Appointment, MoodTracker
+from django import forms
+from django.utils import timezone
+import calendar
+from datetime import date, timedelta, datetime
+from django.contrib.auth import get_user_model
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from weasyprint import HTML
+
+@login_required
+def meds_list(request):
+    medications = Medication.objects.filter(user=request.user)
+    for med in medications:
+        # Find the next scheduled intake log that is in the future
+        next_log = med.intake_logs.filter(scheduled_time__gte=timezone.now(), taken=False).order_by('scheduled_time').first()
+        if next_log:
+            med.next_dose_time = timezone.localtime(next_log.scheduled_time).strftime('%I:%M %p')
+            med.next_dose_note = timezone.localtime(next_log.scheduled_time).strftime('%A, %d %b %Y')
+        else:
+            # Fallback: compute from MedicationSchedule
+            next_time = None
+            next_day = None
+            now = timezone.localtime(timezone.now())
+            schedules = med.schedules.all()
+            soonest_dt = None
+            for sched in schedules:
+                sched_days = [d.strip() for d in sched.days_of_week.split(',')] if sched.days_of_week != 'daily' else ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+                for i in range(8):  # look ahead up to a week
+                    candidate_date = now.date() + timedelta(days=i)
+                    weekday_str = candidate_date.strftime('%a')
+                    if 'daily' in sched_days or weekday_str in sched_days:
+                        candidate_dt = datetime.combine(candidate_date, sched.time)
+                        candidate_dt = timezone.make_aware(candidate_dt)
+                        if candidate_dt > now and (soonest_dt is None or candidate_dt < soonest_dt):
+                            soonest_dt = candidate_dt
+            if soonest_dt:
+                med.next_dose_time = soonest_dt.strftime('%I:%M %p')
+                med.next_dose_note = soonest_dt.strftime('%A, %d %b %Y')
+            else:
+                med.next_dose_time = None
+                med.next_dose_note = ''
+    return render(request, 'meds_list.html', {'medications': medications})
+
+@login_required
+def meds_add(request):
+    if request.method == 'POST':
+        form = MedicationForm(request.POST)
+        if form.is_valid():
+            med = form.save(commit=False)
+            med.user = request.user
+            med.save()
+            return redirect('meds:meds_list')
+    else:
+        form = MedicationForm()
+    return render(request, 'meds_form.html', {'form': form, 'form_title': 'Add Medication'})
+
+@login_required
+def meds_edit(request, med_id):
+    med = get_object_or_404(Medication, id=med_id, user=request.user)
+    if request.method == 'POST':
+        form = MedicationForm(request.POST, instance=med)
+        if form.is_valid():
+            form.save()
+            return redirect('meds:meds_list')
+    else:
+        form = MedicationForm(instance=med)
+    return render(request, 'meds_form.html', {'form': form, 'form_title': 'Edit Medication'})
+
+@login_required
+def meds_delete(request, med_id):
+    med = get_object_or_404(Medication, id=med_id, user=request.user)
+    if request.method == 'POST':
+        med.delete()
+        return redirect('meds:meds_list')
+    return render(request, 'meds_confirm_delete.html', {'medication': med})
+
+@login_required
+def schedules_list(request, med_id):
+    medication = get_object_or_404(Medication, id=med_id, user=request.user)
+    schedules = MedicationSchedule.objects.filter(medication=medication)  # type: ignore
+    return render(request, 'schedules_list.html', {'medication': medication, 'schedules': schedules})
+
+@login_required
+def schedules_add(request, med_id):
+    medication = get_object_or_404(Medication, id=med_id, user=request.user)
+    days_of_week_list = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    if request.method == 'POST':
+        post_data = request.POST.copy()
+        days_selected = post_data.getlist('days_of_week')
+        if days_selected:
+            post_data['days_of_week'] = ','.join(days_selected)
+        form = MedicationScheduleForm(post_data)
+        if form.is_valid():
+            schedule = form.save(commit=False)
+            schedule.medication = medication
+            schedule.save()
+
+            # Schedule reminders for the next 7 days
+            from .tasks import send_med_reminder
+            import datetime
+            now = timezone.localtime(timezone.now())
+            days = [d.strip() for d in schedule.days_of_week.split(',')] if schedule.days_of_week != 'daily' else ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+            for i in range(7):
+                candidate_date = now.date() + timedelta(days=i)
+                weekday_str = candidate_date.strftime('%a')
+                if 'daily' in days or weekday_str in days:
+                    candidate_dt = datetime.datetime.combine(candidate_date, schedule.time)
+                    candidate_dt = timezone.make_aware(candidate_dt)
+                    if candidate_dt > now:
+                        send_med_reminder.apply_async(args=[medication.id], eta=candidate_dt)
+            return redirect('meds:schedules_list', med_id=medication.id)
+    else:
+        form = MedicationScheduleForm()
+    return render(request, 'schedules_form.html', {'form': form, 'form_title': 'Add Schedule', 'medication': medication, 'days_of_week_list': days_of_week_list})
+
+@login_required
+def schedules_edit(request, med_id, schedule_id):
+    medication = get_object_or_404(Medication, id=med_id, user=request.user)
+    schedule = get_object_or_404(MedicationSchedule, id=schedule_id, medication=medication)
+    days_of_week_list = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    if request.method == 'POST':
+        post_data = request.POST.copy()
+        days_selected = post_data.getlist('days_of_week')
+        if days_selected:
+            post_data['days_of_week'] = ','.join(days_selected)
+        form = MedicationScheduleForm(post_data, instance=schedule)
+        if form.is_valid():
+            form.save()
+            return redirect('meds:schedules_list', med_id=medication.id)
+    else:
+        form = MedicationScheduleForm(instance=schedule)
+    return render(request, 'schedules_form.html', {'form': form, 'form_title': 'Edit Schedule', 'medication': medication, 'days_of_week_list': days_of_week_list})
+
+@login_required
+def schedules_delete(request, med_id, schedule_id):
+    medication = get_object_or_404(Medication, id=med_id, user=request.user)
+    schedule = get_object_or_404(MedicationSchedule, id=schedule_id, medication=medication)
+    if request.method == 'POST':
+        schedule.delete()
+        return redirect('meds:schedules_list', med_id=medication.id)
+    return render(request, 'schedules_confirm_delete.html', {'medication': medication, 'schedule': schedule})
+
+@login_required
+def intake_logs_list(request):
+    intake_logs = MedicationIntakeLog.objects.filter(user=request.user).order_by('-scheduled_time')  # type: ignore
+    return render(request, 'intake_logs_list.html', {'intake_logs': intake_logs})
+
+@login_required
+def intake_log_confirm(request, log_id):
+    log = get_object_or_404(MedicationIntakeLog, id=log_id, user=request.user)
+    if request.method == 'POST' and not log.taken and not log.missed:
+        log.taken = True
+        log.confirmed_at = timezone.now()
+        log.save()
+    return redirect('intake_logs_list')
+
+@login_required
+def appointments_list(request):
+    appointments = Appointment.objects.filter(user=request.user).order_by('-date', '-time')  # type: ignore
+    return render(request, 'appointments_list.html', {'appointments': appointments})
+
+@login_required
+def appointments_add(request):
+    if request.method == 'POST':
+        form = AppointmentForm(request.POST)
+        if form.is_valid():
+            appt = form.save(commit=False)
+            appt.user = request.user
+            appt.save()
+            return redirect('meds:appointments_list')
+    else:
+        form = AppointmentForm()
+    return render(request, 'appointments_form.html', {'form': form, 'form_title': 'Add Appointment'})
+
+@login_required
+def appointments_edit(request, appt_id):
+    appt = get_object_or_404(Appointment, id=appt_id, user=request.user)
+    if request.method == 'POST':
+        form = AppointmentForm(request.POST, instance=appt)
+        if form.is_valid():
+            form.save()
+            return redirect('appointments_list')
+    else:
+        form = AppointmentForm(instance=appt)
+    return render(request, 'appointments_form.html', {'form': form, 'form_title': 'Edit Appointment'})
+
+@login_required
+def appointments_delete(request, appt_id):
+    appt = get_object_or_404(Appointment, id=appt_id, user=request.user)
+    if request.method == 'POST':
+        appt.delete()
+        return redirect('appointments_list')
+    return render(request, 'appointments_confirm_delete.html', {'appointment': appt})
+
+@login_required
+def mood_list(request):
+    moods = MoodTracker.objects.filter(user=request.user).order_by('-date')  # type: ignore
+    return render(request, 'mood_list.html', {'moods': moods})
+
+@login_required
+def mood_add(request):
+    if request.method == 'POST':
+        form = MoodTrackerForm(request.POST)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.user = request.user
+            entry.save()
+            return redirect('meds:mood_list')
+    else:
+        form = MoodTrackerForm()
+    return render(request, 'mood_form.html', {'form': form, 'form_title': 'Add Mood Entry'})
+
+@login_required
+def mood_edit(request, entry_id):
+    entry = get_object_or_404(MoodTracker, id=entry_id, user=request.user)
+    if request.method == 'POST':
+        form = MoodTrackerForm(request.POST, instance=entry)
+        if form.is_valid():
+            form.save()
+            return redirect('mood_list')
+    else:
+        form = MoodTrackerForm(instance=entry)
+    return render(request, 'mood_form.html', {'form': form, 'form_title': 'Edit Mood Entry'})
+
+@login_required
+def calendar_view(request):
+    today = date.today()
+    year = today.year
+    month = today.month
+    cal = calendar.Calendar()
+    # Gather all logs, moods, and appointments for the month
+    month_logs = MedicationIntakeLog.objects.filter(user=request.user, scheduled_time__year=year, scheduled_time__month=month)  # type: ignore
+    month_moods = MoodTracker.objects.filter(user=request.user, date__year=year, date__month=month)  # type: ignore
+    month_appts = Appointment.objects.filter(user=request.user, date__year=year, date__month=month)  # type: ignore
+    # Organize by day
+    days = {}
+    for log in month_logs:
+        d = log.scheduled_time.day
+        days.setdefault(d, {'intake_logs': [], 'mood_entries': [], 'appointments': []})
+        days[d]['intake_logs'].append(log)
+    for mood in month_moods:
+        d = mood.date.day
+        days.setdefault(d, {'intake_logs': [], 'mood_entries': [], 'appointments': []})
+        days[d]['mood_entries'].append(mood)
+    for appt in month_appts:
+        d = appt.date.day
+        days.setdefault(d, {'intake_logs': [], 'mood_entries': [], 'appointments': []})
+        days[d]['appointments'].append(appt)
+    # Build calendar weeks
+    month_days = cal.monthdayscalendar(year, month)
+    calendar_weeks = []
+    for week in month_days:
+        week_data = []
+        for d in week:
+            if d == 0:
+                week_data.append(None)
+            else:
+                day_data = {
+                    'day': d,
+                    'intake_logs': days.get(d, {}).get('intake_logs', []),
+                    'mood_entries': days.get(d, {}).get('mood_entries', []),
+                    'appointments': days.get(d, {}).get('appointments', []),
+                }
+                week_data.append(day_data)
+        calendar_weeks.append(week_data)
+    return render(request, 'calendar.html', {'calendar_weeks': calendar_weeks})
+
+@login_required
+def caregiver_dashboard(request):
+    if not hasattr(request.user, 'role') or request.user.role != 'caregiver':
+        return redirect('meds_list')
+    User = get_user_model()
+    patients = User.objects.filter(role='patient')
+    for patient in patients:
+        # Attach missed logs in the last 7 days
+        week_ago = datetime.now() - timedelta(days=7)
+        patient.missed_logs = patient.intake_logs.filter(missed=True, scheduled_time__gte=week_ago)
+    return render(request, 'caregiver_dashboard.html', {'patients': patients})
+
+@login_required
+def pdf_history(request):
+    intake_logs = MedicationIntakeLog.objects.filter(user=request.user).order_by('-scheduled_time')  # type: ignore
+    return render(request, 'pdf_history.html', {'pdfs': intake_logs})
+
+@login_required
+def pdf_download(request):
+    logs = MedicationIntakeLog.objects.filter(user=request.user).order_by('-scheduled_time')
+    html_string = render_to_string('pdf_history.html', {'pdfs': logs, 'user': request.user})
+    html = HTML(string=html_string)
+    pdf = html.write_pdf()
+    response = HttpResponse(pdf, content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="medication_intake_history.pdf"'
+    return response
+
+@login_required
+def test_web_push(request):
+    """Test web push notification"""
+    from MedReminder.Meds.tasks import send_test_push
+    send_test_push.delay(request.user.id)
+    return HttpResponse("Test push notification triggered")
+
+def home_view(request):
+    return render(request, 'home.html')
+
+
+===== FILE: MedReminder\MedReminder\templates\base.html =====
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MedReminder{% endblock %}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Noto+Sans:wght@400;500;700;900&display=swap">
+    <link rel="stylesheet" href="{% static 'theme.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="flex">
+    <aside class="sidebar">
+        <div class="flex flex-col gap-4">
+            <div class="flex gap-3 align-center">
+                <div class="rounded-full size-10" style="background: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCFFiItAPq2JhudhqbK3KB0n_UOMyrKTdW0dIjQElVrYP2fSFUB9aV9vhWhO_LolI00p2YDIw-4MXt9nwQxw53iFP4EUHSKCwTRGQm4c8rhPP2a4D9FWBeze1XppBT7non6CJZocanad5AZNWM9nf70ZVXZ4_DJuRsCXQwh_jxhxiwZc3qgE5tP3Kb2aydLnaDP7Y4MPpNdH-naDArVeoikjP13v7QO_A_6EACTCO5lNkbdEmAM1jdyV-LNKhB-HsOG2Xe8Envoui30') center/cover no-repeat;"></div>
+                <h1 class="text-base font-medium">{{ user.get_full_name|default:user.username }}</h1>
+            </div>
+            <nav class="flex flex-col gap-2">
+                <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">
+                    <!-- Home Icon -->
+                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M218.83,103.77l-80-75.48a1.14,1.14,0,0,1-.11-.11,16,16,0,0,0-21.53,0l-.11.11L37.17,103.77A16,16,0,0,0,32,115.55V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V160h32v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V115.55A16,16,0,0,0,218.83,103.77ZM208,208H160V160a16,16,0,0,0-16-16H112a16,16,0,0,0-16,16v48H48V115.55l.11-.1L128,40l79.9,75.43.11.1Z"></path></svg>
+                    Home
+                </a>
+                <a href="{% url 'meds:meds_list' %}" class="nav-link {% if 'meds' in request.path %}active{% endif %}">
+                    <!-- Pill Icon -->
+                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M216.42,39.6a53.26,53.26,0,0,0-75.32,0L39.6,141.09a53.26,53.26,0,0,0,75.32,75.31h0L216.43,114.91A53.31,53.31,0,0,0,216.42,39.6ZM103.61,205.09h0a37.26,37.26,0,0,1-52.7-52.69L96,107.31,148.7,160ZM205.11,103.6,160,148.69,107.32,96l45.1-45.09a37.26,37.26,0,0,1,52.69,52.69ZM189.68,82.34a8,8,0,0,1,0,11.32l-24,24a8,8,0,1,1-11.31-11.32l24-24A8,8,0,0,1,189.68,82.34Z"></path></svg>
+                    Medications
+                </a>
+                <!-- Reminders nav link removed or updated -->
+                <a href="{% url 'reports:list' %}" class="nav-link {% if 'reports' in request.path %}active{% endif %}">
+                    <!-- Reports Icon -->
+                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M216,40H136V24a8,8,0,0,0-16,0V40H40A16,16,0,0,0,24,56V176a16,16,0,0,0,16,16H79.36L57.75,219a8,8,0,0,0,12.5,10l29.59-37h56.32l29.59,37a8,8,0,1,0,12.5-10l-21.61-27H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,136H40V56H216V176ZM104,120v24a8,8,0,0,1-16,0V120a8,8,0,0,1,16,0Zm32-16v40a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm32-16v56a8,8,0,0,1-16,0V88a8,8,0,0,1,16,0Z"></path></svg>
+                    Reports
+                </a>
+                <a href="{% url 'settings' %}" class="nav-link {% if 'settings' in request.path %}active{% endif %}">
+                    <!-- Settings Icon -->
+                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z"></path></svg>
+                    Settings
+                </a>
+            </nav>
+        </div>
+    </aside>
+    <main class="flex-1 max-w-4xl mx-auto p-8">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+{% block extra_body %}{% endblock %}
+
+<script>
+    // Define global variables for push subscription
+    const serviceWorkerPath = "{% static 'js/serviceworker.js' %}";
+    const vapidPublicKey = "{{ VAPID_PUBLIC_KEY }}";
+    const csrfToken = "{{ csrf_token }}";
+</script>
+<script src="{% static 'js/push-subscription.js' %}"></script>
+
+</body>
+</html>
+
+
+===== FILE: MedReminder\templates\appointments_confirm_delete.html =====
+
+{% extends 'base.html' %}
+{% block title %}Delete Appointment{% endblock %}
+{% block content %}
+<div class="card max-w-xl mx-auto text-center">
+    <h1 class="text-[28px] font-bold mb-4">Delete Appointment</h1>
+    <p>Are you sure you want to delete this appointment?</p>
+    <form method="post" class="mt-4 flex gap-2 justify-center">
+        {% csrf_token %}
+        <button type="submit" class="button">Yes, Delete</button>
+        <a href="{% url 'appointments_list' %}" class="button" style="background: #e6f4ef; color: #0c1c17;">Cancel</a>
+    </form>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\appointments_form.html =====
+
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+{% block title %}Add/Edit Appointment{% endblock %}
+{% block content %}
+<div class="card max-w-xl mx-auto">
+    <h1 class="text-[28px] font-bold mb-4">{% if form.instance.pk %}Edit{% else %}Add{% endif %} Appointment</h1>
+    <form method="post" action="{% if form.instance.pk %}{% url 'meds:appointments_edit' form.instance.pk %}{% else %}{% url 'meds:appointments_add' %}{% endif %}" class="flex flex-col gap-4">
+        {% csrf_token %}
+        <div class="flex flex-col gap-1">
+            <label for="id_doctor_name" class="font-medium text-gray-700">Doctor Name</label>
+            {{ form.doctor_name|add_class:'form-input px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#46a080] focus:border-[#46a080] outline-none'|attr:'required' }}
+            {% for error in form.doctor_name.errors %}<div class="text-red-600 text-sm mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="flex flex-col gap-1">
+            <label for="id_date" class="font-medium text-gray-700">Date</label>
+            <input type="date" name="date" id="id_date" class="form-input px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#46a080] focus:border-[#46a080] outline-none" required value="{{ form.date.value|default_if_none:'' }}">
+            {% for error in form.date.errors %}<div class="text-red-600 text-sm mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="flex flex-col gap-1">
+            <label for="id_time" class="font-medium text-gray-700">Time</label>
+            <input type="time" name="time" id="id_time" class="form-input px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#46a080] focus:border-[#46a080] outline-none" required value="{{ form.time.value|default_if_none:'' }}">
+            {% for error in form.time.errors %}<div class="text-red-600 text-sm mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="flex flex-col gap-1">
+            <label for="id_notes" class="font-medium text-gray-700">Notes</label>
+            {{ form.notes|add_class:'form-input px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#46a080] focus:border-[#46a080] outline-none' }}
+            {% for error in form.notes.errors %}<div class="text-red-600 text-sm mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="flex gap-2 mt-4">
+            <button type="submit" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">save</span> Save</button>
+            <a href="{% url 'meds:appointments_list' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200 transition-colors"><span class="material-icons">close</span> Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\appointments_list.html =====
+
+{% extends 'base.html' %}
+{% block title %}Appointments{% endblock %}
+{% block content %}
+<h1 class="text-[32px] font-bold mb-6">Appointments</h1>
+<div class="flex flex-col gap-4">
+    {% for appt in appointments %}
+    <div class="card flex justify-between items-center">
+        <div>
+            <h2 class="text-lg font-bold">{{ appt.title }}</h2>
+            <p class="text-[#46a080]">{{ appt.date }} | {{ appt.time }}</p>
+        </div>
+        <div class="flex flex-col items-end">
+            <a href="{% url 'appointments_edit' appt.id %}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">edit</span> Edit</a>
+            <a href="{% url 'appointments_delete' appt.id %}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500 text-white font-semibold shadow hover:bg-red-700 transition-colors mt-2"><span class="material-icons">delete</span> Delete</a>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card">No appointments found.</div>
+    {% endfor %}
+</div>
+<div class="mt-6 flex justify-start ml-8">
+    <a href="{% url 'appointments_add' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">event</span> Add Appointment</a>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\base.html =====
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedReminder</title>
+    <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&family=Lexend:wght@400;500;700;900&family=Noto+Sans:wght@400;500;700;900" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style type="text/tailwindcss">
+:root {
+    --primary-color: #10b981;
+    --secondary-color: #ecfdf5;
+    --background-color: #f0fdf4;
+    --text-primary: #064e3b;
+    --text-secondary: #047857;
+    --accent-color: #f43f5e;
+    --sos-color: #ef4444;
+}
+body {
+    font-family: 'Lexend', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-primary);
+}
+</style>
+    <link rel="stylesheet" href="/static/css/elder.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#1976d2">
+    {% block head %}{% endblock %}
+</head>
+<body>
+<div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 min-h-screen bg-white border-r border-green-100 flex flex-col py-8 px-4">
+        <div class="flex items-center gap-3 mb-12">
+            <span class="material-icons text-[var(--primary-color)] text-3xl">add_circle</span>
+            <span class="font-bold text-xl text-[var(--text-primary)]">PillPal</span>
+        </div>
+        <nav class="flex flex-col gap-2 text-[var(--text-secondary)] font-semibold">
+    <a href="/meds/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/meds/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">medication</span> Medications
+    </a>
+    <a href="/appointments/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/appointments/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">event_note</span> Appointments
+    </a>
+    <a href="/calendar/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/calendar/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">calendar_today</span> Calendar
+    </a>
+    <a href="/mood/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/mood/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">mood</span> Mood Tracker
+    </a>
+    <a href="/geofencing/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/geofencing/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">my_location</span> Geofencing
+    </a>
+    <a href="/support/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/support/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">support_agent</span> Support
+    </a>
+    <a href="/chat/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/chat/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">smart_toy</span> Chatbot
+    </a>
+    {% if user.role == 'caregiver' %}
+    <a href="/dashboard/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors {% if request.path == '/dashboard/' %}bg-[var(--secondary-color)] text-[var(--primary-color)]{% endif %}">
+        <span class="material-icons">supervisor_account</span> Caregiver Dashboard
+    </a>
+    {% endif %}
+    {% if user.is_superuser %}
+    <a href="/admin/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors">
+        <span class="material-icons">admin_panel_settings</span> Admin
+    </a>
+    {% endif %}
+</nav>
+        <div class="mt-auto flex flex-col gap-4">
+            <div class="flex items-center gap-2">
+                <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuA42drP78SR2IZLFu5XkXvFcDkK_vV0qDIGNUV5OOLed27l6Zm8ZtKTz1fZfUkE9yMFthumlePemPRjuj0AweYvSv_-TYmslxeehRgb_SO95BfzQXviFgJT7wjS6soID5AY95GS590byoTen_prZetnB2raCP8SXesisCpeGYyFjJATlJRzrdhl8J2IkTjZXMiKG6u9hCEcGUQniwW6dCkogFQ9zkdSDCwQibe8zFLlX3059mIH1maXuHpphDs10_jc3q93-tk7jjuq" alt="User avatar" class="h-8 w-8 rounded-full object-cover">
+                <span class="text-[var(--text-primary)]">{{ user.first_name|default:user.username }}</span>
+            </div>
+            <a href="/logout/" class="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-green-50 transition-colors text-[var(--text-secondary)]">
+                <span class="material-icons">logout</span> Logout
+            </a>
+        </div>
+    </aside>
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col">
+        <!-- Header -->
+        <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-green-200 px-10 py-4 bg-white shadow-sm">
+            <div class="flex items-center gap-3 text-[var(--text-primary)]">
+                <h1 class="text-2xl font-bold tracking-tight">{% block title %}MedReminder{% endblock %}</h1>
+            </div>
+            <div class="flex items-center gap-6">
+                <nav class="flex items-center gap-6 text-sm font-medium text-[var(--text-secondary)]">
+                    <a class="hover:text-[var(--primary-color)] transition-colors" href="/">Home</a>
+                    <a class="hover:text-[var(--primary-color)] transition-colors" href="/support/">Support</a>
+                </nav>
+                <div class="flex items-center gap-4">
+                    <button class="relative">
+                        <span class="material-icons text-gray-600 hover:text-[var(--primary-color)] transition-colors">notifications</span>
+                        <span class="absolute top-0 right-0 h-2 w-2 rounded-full bg-[var(--accent-color)]"></span>
+                    </button>
+                    <img alt="User avatar" class="h-10 w-10 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA42drP78SR2IZLFu5XkXvFcDkK_vV0qDIGNUV5OOLed27l6Zm8ZtKTz1fZfUkE9yMFthumlePemPRjuj0AweYvSv_-TYmslxeehRgb_SO95BfzQXviFgJT7wjS6soID5AY95GS590byoTen_prZetnB2raCP8SXesisCpeGYyFjJATlJRzrdhl8J2IkTjZXMiKG6u9hCEcGUQniwW6dCkogFQ9zkdSDCwQibe8zFLlX3059mIH1maXuHpphDs10_jc3q93-tk7jjuq"/>
+                </div>
+            </div>
+        </header>
+        <main class="flex-1 px-4 sm:px-6 lg:px-8 py-12">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">MedReminder</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        {% if user.is_authenticated %}
+          <li class="nav-item"><a class="nav-link" href="/meds/">Medications</a></li>
+          <li class="nav-item"><a class="nav-link" href="/appointments/">Appointments</a></li>
+          <li class="nav-item"><a class="nav-link" href="/calendar/">Calendar</a></li>
+          <li class="nav-item"><a class="nav-link" href="/mood/">Mood Tracker</a></li>
+          <li class="nav-item"><a class="nav-link" href="/geofencing/">Geofencing</a></li>
+          <li class="nav-item"><a class="nav-link" href="/chat/">Chatbot</a></li>
+          {% if user.role == 'caregiver' %}
+            <li class="nav-item"><a class="nav-link" href="/dashboard/">Caregiver Dashboard</a></li>
+          {% endif %}
+          {% if user.is_superuser %}
+            <li class="nav-item"><a class="nav-link" href="/admin/">Admin</a></li>
+          {% endif %}
+          <li class="nav-item"><a class="nav-link" href="/logout/">Logout</a></li>
+        {% else %}
+          <li class="nav-item"><a class="nav-link" href="/login/">Login</a></li>
+          <li class="nav-item"><a class="nav-link" href="/register/">Register</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+{% block scripts %}{% endblock %}
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/static/service-worker.js');
+  });
+}
+</script>
+</body>
+</html>
+
+
+===== FILE: MedReminder\templates\calendar.html =====
+
+{% extends 'base.html' %}
+{% block title %}Calendar{% endblock %}
+{% block content %}
+<div class="card max-w-4xl mx-auto">
+    <h1 class="text-[32px] font-bold mb-6">Calendar</h1>
+    <div class="mb-4">
+        <table class="w-full border-collapse text-center">
+            <thead>
+                <tr>
+                    <th>Mon</th>
+                    <th>Tue</th>
+                    <th>Wed</th>
+                    <th>Thu</th>
+                    <th>Fri</th>
+                    <th>Sat</th>
+                    <th>Sun</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for week in calendar_weeks %}
+                <tr>
+                    {% for day in week %}
+                        <td class="border p-2 align-top min-h-[80px]">
+                            {% if day %}
+                                <div class="font-bold">{{ day.day }}</div>
+                                {% for log in day.intake_logs %}
+                                    {% if log.missed %}
+                                        <div class="bg-red-100 text-red-700 rounded px-1 mt-1 text-xs">Missed: {{ log.medication.name }}</div>
+                                    {% elif log.taken %}
+                                        <div class="bg-green-100 text-green-700 rounded px-1 mt-1 text-xs">Taken: {{ log.medication.name }}</div>
+                                    {% endif %}
+                                {% endfor %}
+                                {% for mood in day.mood_entries %}
+                                    <div class="bg-blue-100 text-blue-700 rounded px-1 mt-1 text-xs">Mood: {{ mood.mood }}</div>
+                                {% endfor %}
+                                {% for appt in day.appointments %}
+                                    <div class="bg-yellow-100 text-yellow-800 rounded px-1 mt-1 text-xs">
+                                        Appointment: {{ appt.doctor_name }} at {{ appt.time|time:'H:i' }}
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="flex gap-4 mt-4" style="gap: 1.5rem;">
+        <a href="{% url 'appointments_add' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">event</span> Add Appointment</a>
+        <a href="{% url 'mood_add' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">mood</span> Add Mood Entry</a>
+        <a href="{% url 'pdf_download' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">download</span> Download PDF</a>
+    </div>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\caregiver_dashboard.html =====
+
+{% extends 'base.html' %}
+{% block title %}Caregiver Dashboard{% endblock %}
+{% block content %}
+<h1 class="text-[32px] font-bold mb-6">Caregiver Dashboard</h1>
+<div class="flex flex-col gap-4">
+    <div class="card">
+        <h2 class="text-lg font-bold mb-2">Patients</h2>
+        <ul>
+            {% for patient in patients %}
+            <li>{{ patient.get_full_name|default:patient.username }}</li>
+            {% empty %}
+            <li>No patients assigned.</li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="card">
+        <h2 class="text-lg font-bold mb-2">Recent Activity</h2>
+        <ul>
+            {% for activity in recent_activity %}
+            <li>{{ activity }}</li>
+            {% empty %}
+            <li>No recent activity.</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\chatbot.html =====
+
+{% extends 'base.html' %}
+{% block title %}Chatbot{% endblock %}
+{% block content %}
+<div class="flex flex-col h-[80vh] max-h-[80vh]">
+    <div class="flex-1 flex flex-col p-4 md:p-8 overflow-hidden">
+        <div id="chatbox" class="flex-1 overflow-y-auto space-y-6 pr-2">
+            {% for message in chat_history %}
+                {% if message.sender == 'bot' %}
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-[var(--primary-color)] flex items-center justify-center text-white">
+                        <span class="material-icons">smart_toy</span>
+                    </div>
+                    <div class="flex flex-col">
+                        <div class="bg-white rounded-r-xl rounded-bl-xl p-4 shadow-sm">
+                            <p class="text-md text-[var(--text-primary)]">{{ message.message }}</p>
+                        </div>
+                        <span class="text-xs text-gray-500 mt-1 ml-1">{{ message.timestamp|date:'h:i A' }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="flex items-start gap-4 justify-end">
+                    <div class="flex flex-col items-end">
+                        <div class="bg-[var(--primary-color)] text-white rounded-l-xl rounded-br-xl p-4 shadow-sm">
+                            <p class="text-md">{{ message.message }}</p>
+                        </div>
+                        <span class="text-xs text-gray-500 mt-1 mr-1">{{ message.timestamp|date:'h:i A' }}</span>
+                    </div>
+                    <img alt="User avatar" class="h-10 w-10 rounded-full object-cover" src="{{ user.avatar_url|default:'/static/img/default-avatar.png' }}"/>
+                </div>
+                {% endif %}
+            {% empty %}
+                <div class="text-gray-400 text-center">No messages yet. Say hello!</div>
+            {% endfor %}
+        </div>
+        <form id="chat-form" method="post" class="mt-6 flex items-center gap-4">
+            {% csrf_token %}
+            <input id="chat-input" type="text" name="message" placeholder="Type your message..." autocomplete="off" class="flex-1 px-4 py-3 border border-green-200 rounded-full focus:ring-2 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] transition-shadow"/>
+            <button type="submit" class="flex items-center justify-center h-12 w-12 rounded-full bg-[var(--primary-color)] text-white hover:bg-emerald-600 transition-colors shadow-md hover:shadow-lg">
+                <span class="material-icons">send</span>
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const chatForm = document.getElementById('chat-form');
+const chatInput = document.getElementById('chat-input');
+const chatbox = document.getElementById('chatbox');
+const userAvatarUrl = "{{ user.avatar_url|default:'/static/img/default-avatar.png' }}";
+function formatTime(date) {
+    // Format to h:mm AM/PM
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+chatForm.onsubmit = function(e) {
+    e.preventDefault();
+    const msg = chatInput.value;
+    if (!msg) return;
+    const now = new Date();
+    // User message bubble (right)
+    chatbox.innerHTML += `
+    <div class="flex items-start gap-4 justify-end">
+        <div class="flex flex-col items-end">
+            <div class="bg-[var(--primary-color)] text-white rounded-l-xl rounded-br-xl p-4 shadow-sm">
+                <p class="text-md">${msg}</p>
+            </div>
+            <span class="text-xs text-gray-500 mt-1 mr-1">${formatTime(now)}</span>
+        </div>
+        <img alt="User avatar" class="h-10 w-10 rounded-full object-cover" src="${userAvatarUrl}"/>
+    </div>`;
+    chatbox.scrollTop = chatbox.scrollHeight;
+    chatInput.value = '';
+    fetch('/chat/chat/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}',
+        },
+        body: JSON.stringify({message: msg})
+    })
+    .then(response => response.json())
+    .then(data => {
+        const nowBot = new Date();
+        // Bot message bubble (left)
+        chatbox.innerHTML += `
+        <div class=\"flex items-start gap-4\">\n            <div class=\"flex-shrink-0 h-10 w-10 rounded-full bg-[var(--primary-color)] flex items-center justify-center text-white\">\n                <span class=\"material-icons\">smart_toy</span>\n            </div>\n            <div class=\"flex flex-col\">\n                <div class=\"bg-white rounded-r-xl rounded-bl-xl p-4 shadow-sm\">\n                    <p class=\"text-md text-[var(--text-primary)]\">${data.bot}</p>\n                </div>\n                <span class=\"text-xs text-gray-500 mt-1 ml-1\">${formatTime(nowBot)}</span>\n            </div>\n        </div>`;
+        chatbox.scrollTop = chatbox.scrollHeight;
+    });
+};
+</script>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\geofencing.html =====
+
+{% extends 'base.html' %}
+{% block title %}Geofencing{% endblock %}
+{% block content %}
+<div class="card max-w-4xl mx-auto">
+    <h1 class="text-[32px] font-bold mb-6">Geofencing</h1>
+    <div class="flex justify-end mb-4">
+        <form method="post" action="{% url 'geofencing:toggle_geofencing' %}">
+            {% csrf_token %}
+            {% if user.geofencing_enabled %}
+                <button type="submit" class="btn btn-warning">Disable Geofencing</button>
+            {% else %}
+                <button type="submit" class="btn btn-success">Enable Geofencing</button>
+            {% endif %}
+        </form>
+    </div>
+    <div class="mb-6">
+        <h2 class="text-xl font-semibold mb-2">Your Geofence Zones</h2>
+        {% if geofences %}
+        <table class="w-full border text-left mb-4">
+            <thead>
+                <tr>
+                    <th class="p-2">Name</th>
+                    <th class="p-2">Latitude</th>
+                    <th class="p-2">Longitude</th>
+                    <th class="p-2">Radius (m)</th>
+                    <th class="p-2">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for zone in geofences %}
+                <tr>
+                    <td class="p-2">{{ zone.name }}</td>
+                    <td class="p-2">{{ zone.latitude }}</td>
+                    <td class="p-2">{{ zone.longitude }}</td>
+                    <td class="p-2">{{ zone.radius_meters }}</td>
+                    <td class="p-2">
+                        <form method="post" action="{% url 'geofencing:geofencing_delete' zone.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-gray-500 mb-4">No geofence zones defined yet.</div>
+        {% endif %}
+    </div>
+    <div class="mb-4">
+        <!-- Geofencing map or info here -->
+        <div id="map" style="width:100%;height:400px;"></div>
+    </div>
+    <form method="post" action="{% url 'geofencing:geofencing_add' %}" class="flex gap-4 mt-4">
+        {% csrf_token %}
+        <input type="text" name="name" placeholder="Zone Name" required class="px-4 py-2 rounded-lg border border-green-200 bg-white font-semibold text-[var(--text-secondary)] hover:bg-green-50 transition-colors text-center" />
+        <input type="hidden" name="latitude" id="latitude" />
+        <input type="hidden" name="longitude" id="longitude" />
+        <input type="number" name="radius_meters" placeholder="Radius (m)" required class="px-4 py-2 rounded-lg border border-green-200 bg-white font-semibold text-[var(--text-secondary)] hover:bg-green-50 transition-colors text-center" />
+        <button type="submit" class="btn btn-success">Add Geofence</button>
+        <span id="location-helper" class="text-gray-500 text-sm ml-2">Click on the map to select location</span>
+    </form>
+</div>
+{% endblock %}
+{% block scripts %}
+{% include 'leaflet_includes.html' %}
+<script>
+function haversineDistance(lat1, lon1, lat2, lon2) {
+    function toRad(x) { return x * Math.PI / 180; }
+    var R = 6371000; // meters
+    var dLat = toRad(lat2 - lat1);
+    var dLon = toRad(lon2 - lon1);
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+var geofences = [
+    {% for zone in geofences %}
+    {
+        name: "{{ zone.name|escapejs }}",
+        lat: parseFloat("{{ zone.latitude }}"),
+        lng: parseFloat("{{ zone.longitude }}"),
+        radius: parseFloat("{{ zone.radius_meters|default:100 }}")
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+];
+
+function checkGeofence(position) {
+    var userLat = position.coords.latitude;
+    var userLng = position.coords.longitude;
+    var insideAny = false;
+    for (var i = 0; i < geofences.length; i++) {
+        var zone = geofences[i];
+        var dist = haversineDistance(userLat, userLng, zone.lat, zone.lng);
+        if (dist <= zone.radius) {
+            insideAny = true;
+            break;
+        }
+    }
+    if (!insideAny && geofences.length > 0) {
+        alert('You have left your geofence zone!');
+    }
+}
+
+function monitorGeofence() {
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(checkGeofence, function(err) {}, {enableHighAccuracy:true, maximumAge:10000, timeout:10000});
+    }
+}
+
+function initMap() {
+    var map = L.map('map').setView([28.6139, 77.2090], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: ' OpenStreetMap contributors'
+    }).addTo(map);
+    // Add geofence circles
+    geofences.forEach(function(zone) {
+        L.circle([zone.lat, zone.lng], {
+            color: '#FF0000',
+            fillColor: '#FF0000',
+            fillOpacity: 0.2,
+            radius: zone.radius
+        }).addTo(map).bindPopup(zone.name + ' (' + zone.radius + 'm)');
+    });
+    // Optionally add user marker if geolocation available
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            var userMarker = L.marker([position.coords.latitude, position.coords.longitude]).addTo(map);
+            userMarker.bindPopup('Your Location').openPopup();
+            map.setView([position.coords.latitude, position.coords.longitude], 14);
+        });
+    }
+    // Add click handler for new geofence
+    var newMarker = null;
+    map.on('click', function(e) {
+        var lat = e.latlng.lat.toFixed(6);
+        var lng = e.latlng.lng.toFixed(6);
+        document.getElementById('latitude').value = lat;
+        document.getElementById('longitude').value = lng;
+        if (newMarker) { map.removeLayer(newMarker); }
+        newMarker = L.marker([lat, lng]).addTo(map).bindPopup('New Geofence Location').openPopup();
+    });
+}
+window.onload = function() {
+    initMap();
+    {% if user.geofencing_enabled %}
+    monitorGeofence();
+    {% endif %}
+};
+</script>
+{% endblock %}
+
+
+===== FILE: MedReminder\templates\home.html =====
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MedReminder - Medication Reminder</title>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&family=Lexend:wght@400;500;700;900&family=Noto+Sans:wght@400;500;700;900" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style type="text/tailwindcss">
+        :root {
+            --primary-color: #10b981;--secondary-color: #ecfdf5;--background-color: #f0fdf4;--text-primary: #064e3b;--text-secondary: #047857;--accent-color: #f43f5e;--sos-color: #ef4444;
+            --sos-background: #fee2e2;
+        }
+        body {
+            font-family: 'Lexend', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+        }
+        .feature_card {
+            @apply bg-white rounded-xl shadow-lg p-6 flex flex-col items-center justify-center text-center hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 ease-in-out cursor-pointer;
+        }
+        .feature_icon {
+            @apply text-4xl text-[var(--primary-color)] mb-4;
+        }
+        .feature_text {
+            @apply text-lg font-semibold text-[var(--text-primary)];
+        }
+    </style>
+</head>
+<body class="bg-[var(--background-color)]">
+<div class="relative flex size-full min-h-screen flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-green-200 px-10 py-4 bg-white shadow-sm">
+<div class="flex items-center gap-3 text-[var(--text-primary)]">
+<div class="text-[var(--primary-color)]">
+<svg class="h-8 w-8" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h1 class="text-2xl font-bold tracking-tight">MedReminder</h1>
+</div>
+<div class="flex items-center gap-6">
+<nav class="flex items-center gap-6 text-sm font-medium text-[var(--text-secondary)]">
+<a class="hover:text-[var(--primary-color)] transition-colors" href="/">Home</a>
+<a class="hover:text-[var(--primary-color)] transition-colors" href="/support/">Support</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="relative">
+<span class="material-icons text-gray-600 hover:text-[var(--primary-color)] transition-colors">notifications</span>
+<span class="absolute top-0 right-0 h-2 w-2 rounded-full bg-[var(--accent-color)]"></span>
+</button>
+<img alt="User avatar" class="h-10 w-10 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA42drP78SR2IZLFu5XkXvFcDkK_vV0qDIGNUV5OOLed27l6Zm8ZtKTz1fZfUkE9yMFthumlePemPRjuj0AweYvSv_-TYmslxeehRgb_SO95BfzQXviFgJT7wjS6soID5AY95GS590byoTen_prZetnB2raCP8SXesisCpeGYyFjJATlJRzrdhl8J2IkTjZXMiKG6u9hCEcGUQniwW6dCkogFQ9zkdSDCwQibe8zFLlX3059mIH1maXuHpphDs10_jc3q93-tk7jjuq"/>
+</div>
+</div>
+</header>
+<main class="flex-1 px-4 sm:px-6 lg:px-8 py-12">
+<div class="max-w-6xl mx-auto">
+<div class="mb-12 text-center">
+<h2 class="text-5xl font-bold text-[var(--text-primary)] tracking-tighter">Welcome back, {{ user.first_name|default:user.username }}!</h2>
+<p class="mt-4 text-xl text-[var(--text-secondary)]">How can we help you today?</p>
+</div>
+<div class="flex justify-center">
+  <div class="grid grid-cols-3 gap-8 w-full max-w-2xl">
+    <a href="/meds/" class="feature_card">
+      <span class="material-icons feature_icon">medication</span>
+      <span class="feature_text">Medications</span>
+    </a>
+    <a href="/appointments/" class="feature_card">
+      <span class="material-icons feature_icon">event</span>
+      <span class="feature_text">Appointments</span>
+    </a>
+    <a href="/calendar/" class="feature_card">
+      <span class="material-icons feature_icon">calendar_today</span>
+      <span class="feature_text">Calendar</span>
+    </a>
+    <a href="/mood/" class="feature_card">
+      <span class="material-icons feature_icon">sentiment_very_satisfied</span>
+      <span class="feature_text">Mood Tracker</span>
+    </a>
+    <a href="/geofencing/" class="feature_card">
+      <span class="material-icons feature_icon">location_on</span>
+      <span class="feature_text">Geofencing</span>
+    </a>
+    <a href="/chat/" class="feature_card">
+      <span class="material-icons feature_icon">chat</span>
+      <span class="feature_text">Chatbot</span>
+    </a>
+  </div>
+</div>
+<div class="mt-16 flex justify-center">
+<a href="/logout/" class="flex items-center gap-2 px-8 py-3 rounded-full bg-white text-[var(--text-secondary)] hover:bg-green-50 transition-colors font-semibold shadow-md hover:shadow-lg border border-green-200">
+<span class="material-icons">logout</span>
+Logout
+</a>
+</div>
+</div>
+</main>
+</div>
+</div>
+
+</body>
+</html>
+
+
+
+===== FILE: MedReminder\templates\intake_logs_list.html =====
+
+{% extends 'base.html' %}
+{% block title %}Intake Logs{% endblock %}
+{% block content %}
+<h1 class="text-[32px] font-bold mb-6">Intake Logs</h1>
+<div class="flex flex-col gap-4">
+    {% for log in intake_logs %}
+    <div class="card flex justify-between items-center">
+        <div>
+            <h2 class="text-lg font-bold">{{ log.medication.name }}</h2>
+            <p class="text-[#46a080]">{{ log.date }} | {{ log.status }}</p>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card">No intake logs found.</div>
+    {% endfor %}
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\leaflet_includes.html =====
+
+<!-- Leaflet.js CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<!-- Leaflet.js JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+
+
+===== FILE: MedReminder\templates\meds_confirm_delete.html =====
+
+{% extends 'base.html' %}
+{% block content %}
+<h2>Delete Medication</h2>
+<p>Are you sure you want to delete <strong>{{ medication.name }}</strong>?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Delete</button>
+    <a href="/meds/" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\meds_form.html =====
+
+{% extends 'base.html' %}
+{% block title %}Add Medication{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-8 mt-8">
+    <h1 class="text-3xl font-bold text-[var(--text-primary)] mb-8">Add Medication</h1>
+    <form method="post" class="space-y-8">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+        <div class="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+            {% for error in form.non_field_errors %}{{ error }}<br>{% endfor %}
+        </div>
+    {% endif %}
+        <div>
+            <label class="block text-lg font-semibold text-[var(--text-primary)] mb-2" for="id_name">Medication Name</label>
+            {{ form.name }}
+            {% for error in form.name.errors %}<div class="text-red-600">{{ error }}</div>{% endfor %}
+        </div>
+        <div>
+            <label class="block text-lg font-semibold text-[var(--text-primary)] mb-2" for="id_instructions">Dosage Instructions</label>
+            {{ form.instructions }}
+            {% for error in form.instructions.errors %}<div class="text-red-600">{{ error }}</div>{% endfor %}
+        </div>
+        <div>
+            <label class="block text-lg font-semibold text-[var(--text-primary)] mb-2" for="id_inventory_count">Inventory</label>
+            {{ form.inventory_count }}
+            {% for error in form.inventory_count.errors %}<div class="text-red-600">{{ error }}</div>{% endfor %}
+        </div>
+        <div>
+            <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-4">Schedule</h3>
+            <div class="flex flex-col gap-6">
+                <div class="flex items-center justify-between gap-4 flex-wrap">
+                    <span class="text-md font-medium text-[var(--text-secondary)]">Days of the week:</span>
+                    <div class="flex gap-2 flex-wrap">
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="S">S</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="M">M</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="T">T</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="W">W</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="T2">T</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="F">F</button>
+    <button type="button" class="days-of-week-btn px-4 py-2 rounded-full border border-gray-300 text-gray-700 bg-white hover:bg-green-50 hover:border-[var(--primary-color)] hover:text-[var(--primary-color)] transition-colors focus:bg-[var(--secondary-color)] focus:text-[var(--primary-color)] focus:border-[var(--primary-color)]" data-day="S2">S</button>
+</div>
+                </div>
+                <div class="flex items-center gap-4 mt-4">
+                    <label class="text-md font-medium text-[var(--text-secondary)]" for="id_time">Time:</label>
+                    <input type="time" name="time" id="id_time" class="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] transition-shadow" />
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-end gap-4 pt-6 border-t border-gray-200">
+            <a href="{% url 'meds:meds_list' %}" class="px-8 py-3 rounded-full text-lg font-semibold text-[var(--text-secondary)] bg-gray-100 hover:bg-gray-200 transition-colors">Cancel</a>
+            <button type="submit" class="px-8 py-3 rounded-full text-lg font-semibold text-white bg-[var(--primary-color)] hover:bg-emerald-600 transition-colors shadow-md hover:shadow-lg">Save</button>
+        </div>
+        <input type="hidden" name="days_of_week" id="days_of_week" />
+        <input type="hidden" name="schedule_time" id="schedule_time" />
+    </form>
+</div>
+<script>
+    // Day-of-week button selection logic
+    const dayButtons = document.querySelectorAll('.days-of-week-btn');
+    const daysOfWeekInput = document.getElementById('days_of_week');
+    let selectedDays = [];
+    dayButtons.forEach((btn, i) => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const day = btn.dataset.day;
+            btn.classList.toggle('bg-[var(--secondary-color)]');
+            btn.classList.toggle('text-[var(--primary-color)]');
+            btn.classList.toggle('border-[var(--primary-color)]');
+            if (selectedDays.includes(day)) {
+                selectedDays = selectedDays.filter(d => d !== day);
+            } else {
+                selectedDays.push(day);
+            }
+            daysOfWeekInput.value = selectedDays.join(',');
+        });
+    });
+    // Time input logic
+    const timeInput = document.getElementById('id_time');
+    const scheduleTimeInput = document.getElementById('schedule_time');
+    if (timeInput) {
+        timeInput.addEventListener('change', function() {
+            scheduleTimeInput.value = timeInput.value;
+        });
+    }
+    // On submit, ensure values are set
+    document.querySelector('form').addEventListener('submit', function() {
+        daysOfWeekInput.value = selectedDays.join(',');
+        scheduleTimeInput.value = timeInput.value;
+    });
+</script>
+{% endblock %}
+
+
+===== FILE: MedReminder\templates\meds_list.html =====
+
+{% extends 'base.html' %}
+{% block title %}Medications{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-8">
+    <h1 class="text-4xl font-bold text-[var(--text-primary)]">Your Medications</h1>
+    <a href="{% url 'meds:meds_add' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors">
+        <span class="material-icons">add</span> Add Medication
+    </a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    {% for med in medications %}
+    <div class="bg-white rounded-2xl shadow-lg p-6 flex flex-col gap-4 min-w-[320px]">
+        <div class="flex items-start justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-[var(--text-primary)]">{{ med.name }}</h2>
+                <div class="text-[var(--text-secondary)] text-sm font-medium">{{ med.dosage }}{% if med.frequency %}, {{ med.frequency }}{% endif %}</div>
+            </div>
+            <div class="flex gap-2">
+                <a href="{% url 'meds:meds_edit' med.id %}" class="hover:text-[var(--primary-color)]"><span class="material-icons">edit</span></a>
+                <a href="{% url 'meds:meds_delete' med.id %}" class="hover:text-[var(--accent-color)]"><span class="material-icons">delete</span></a>
+            </div>
+        </div>
+        <div class="bg-[var(--secondary-color)] rounded-xl p-4 flex items-center gap-4">
+            <span class="material-icons text-2xl text-[var(--primary-color)]">alarm</span>
+            <div>
+                <span class="font-bold text-[var(--text-primary)]">Next Dose: {{ med.next_dose_time|default:'--' }}</span><br>
+                <span class="text-[var(--text-secondary)] text-sm">{{ med.next_dose_note|default:'' }}</span>
+            </div>
+        </div>
+        <a href="{% url 'meds:schedules_list' med.id %}" class="px-4 py-2 rounded-lg border border-green-200 bg-white font-semibold text-[var(--text-secondary)] hover:bg-green-50 transition-colors text-center">Manage Schedule</a>
+    </div>
+    {% empty %}
+    <div class="col-span-full text-center text-[var(--text-secondary)]">No medications found.</div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+
+===== FILE: MedReminder\templates\mood_confirm_delete.html =====
+
+{% extends 'base.html' %}
+{% block title %}Delete Mood Entry{% endblock %}
+{% block content %}
+<div class="card max-w-xl mx-auto text-center">
+    <h1 class="text-[28px] font-bold mb-4">Delete Mood Entry</h1>
+    <p>Are you sure you want to delete this mood entry for <strong>{{ mood.date }}</strong>?</p>
+    <form method="post" class="mt-4 flex gap-2 justify-center">
+        {% csrf_token %}
+        <button type="submit" class="button">Yes, Delete</button>
+        <a href="{% url 'meds:mood_list' %}" class="button" style="background: #e6f4ef; color: #0c1c17;">Cancel</a>
+    </form>
+</div>
+{% endblock %}
+
+
+
+===== FILE: MedReminder\templates\mood_form.html =====
+
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+{% block title %}Add/Edit Mood{% endblock %}
+{% block content %}
+<div class="card max-w-xl mx-auto">
+    <h1 class="text-[28px] font-bold mb-4">{% if form.instance.pk %}Edit{% else %}Add{% endif %} Mood</h1>
+    <form method="post" action="{% if form.instance.pk %}{% url 'meds:mood_edit' form.instance.pk %}{% else %}{% url 'meds:mood_add' %}{% endif %}" class="flex flex-col gap-4">
+        {% csrf_token %}
+        <div class="flex flex-col gap-1">
+            <label for="id_date" class="font-medium text-gray-700">Date</label>
+            {{ form.date|add_class:'form-input px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#46a080] focus:border-[#46a080] outline-none'|attr:'required' }}
+            {% for error in form.date.errors %}<div class="text-red-600 text-sm mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="flex flex-col gap-1">
+            <label for="id_mood" class="font-medium text-gray-700">Mood (1-10)</label>
+            {{ form.mood|add_class:'form-input px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#46a080] focus:border-[#46a080] outline-none'|attr:'required' }}
+            {% for error in form.mood.errors %}<div class="text-red-600 text-sm mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="flex flex-col gap-1">
+            <label for="id_notes" class="font-medium text-gray-700">Notes</label>
+            {{ form.notes|add_class:'form-input px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-[#46a080] focus:border-[#46a080] outline-none' }}
+            {% for error in form.notes.errors %}<div class="text-red-600 text-sm mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="flex gap-2 mt-4">
+            <button type="submit" class="flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">save</span> Save</button>
+            <a href="{% url 'meds:mood_list' %}" class="flex items-center gap-2 px-6 py-3 rounded-full bg-gray-100 text-gray-700 font-semibold shadow hover:bg-gray-200 transition-colors"><span class="material-icons">close</span> Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\mood_list.html =====
+
+
+{% extends 'base.html' %}
+{% block title %}Mood History{% endblock %}
+{% block content %}
+<h1 class="text-[32px] font-bold mb-6">Mood History</h1>
+<div class="flex flex-col gap-4">
+    {% for mood in moods %}
+    <div class="card flex justify-between items-center">
+        <div>
+            <h2 class="text-lg font-bold">{{ mood.date }}</h2>
+            <p class="text-[#46a080]">{{ mood.mood }}</p>
+        </div>
+        <div class="flex gap-4" style="gap: 1.5rem;">
+            <a href="{% url 'meds:mood_edit' mood.id %}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors"><span class="material-icons">edit</span> Edit</a>
+            <a href="{% url 'meds:mood_delete' mood.id %}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500 text-white font-semibold shadow hover:bg-red-700 transition-colors"><span class="material-icons">delete</span> Delete</a>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card">No mood entries found.</div>
+    {% endfor %}
+</div>
+<div class="mt-8 flex justify-start ml-8">
+    <a href="{% url 'meds:mood_add' %}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors">
+        <span class="material-icons">mood</span> Add Mood Entry
+    </a>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\pdf_history.html =====
+
+{% extends 'base.html' %}
+{% block title %}PDF History{% endblock %}
+{% block content %}
+<div class="card max-w-4xl mx-auto">
+    <h1 class="text-[32px] font-bold mb-6">PDF History</h1>
+    <ul>
+        {% for log in pdfs %}
+        <li>
+            <strong>{{ log.medication.name }}</strong> — {{ log.scheduled_time|date:'Y-m-d H:i' }} — {% if log.taken %}Taken{% else %}Missed{% endif %}
+            {% if log.notes %}<br><em>Notes: {{ log.notes }}</em>{% endif %}
+        </li>
+        {% empty %}
+        <li>No medication intake logs found.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}
+
+
+===== FILE: MedReminder\templates\schedules_confirm_delete.html =====
+
+{% extends 'base.html' %}
+{% block content %}
+<h2>Delete Schedule</h2>
+<p>Are you sure you want to delete this schedule for <strong>{{ medication.name }}</strong>?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Delete</button>
+    <a href="/meds/{{ medication.id }}/schedules/" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\schedules_form.html =====
+
+{% extends 'base.html' %}
+{% block title %}Add/Edit Reminder{% endblock %}
+{% block content %}
+<div class="card max-w-xl mx-auto">
+    <h1 class="text-[28px] font-bold mb-4">{% if form.instance.pk %}Edit{% else %}Add{% endif %} Reminder</h1>
+    <form method="post" class="flex flex-col gap-2">
+        {% csrf_token %}
+        {% for field in form %}
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<small class="text-[#46a080]">{{ field.help_text }}</small>{% endif %}
+            {% for error in field.errors %}<div class="text-red-600">{{ error }}</div>{% endfor %}
+        {% endfor %}
+        <div class="flex gap-2 mt-4">
+            <button type="submit" class="button">Save</button>
+            <a href="{% url 'meds:meds_list' %}" class="button" style="background: #e6f4ef; color: #0c1c17;">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\schedules_list.html =====
+
+{% extends 'base.html' %}
+{% block title %}Reminders{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h1 class="text-[32px] font-bold mb-2">Reminders</h1>
+    <p class="text-[#46a080] text-base mb-8">Manage your upcoming and missed medication reminders.</p>
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-bold">All Schedules for {{ medication.name }}</h2>
+            <a href="{% url 'meds:schedules_add' medication.id %}" class="px-5 py-2 rounded-full bg-[var(--primary-color)] text-white font-semibold shadow hover:bg-emerald-600 transition-colors">+ Add Schedule</a>
+        </div>
+        <div class="flex flex-col gap-3">
+            {% for schedule in schedules %}
+            <div class="flex items-center gap-4 bg-[#f8fcfa] rounded-xl px-6 py-3 shadow-sm">
+                <div class="flex-1">
+                    <span class="font-bold">Time:</span> {{ schedule.time }}<br>
+                    <span class="font-bold">Days:</span> {{ schedule.days_of_week }}
+                </div>
+                <a href="{% url 'meds:schedules_edit' medication.id schedule.id %}" class="btn btn-secondary btn-sm">Edit</a>
+                <a href="{% url 'meds:schedules_delete' medication.id schedule.id %}" class="btn btn-danger btn-sm">Delete</a>
+            </div>
+            {% empty %}
+            <div class="text-gray-400">No schedules found for this medication.</div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="mb-8">
+        <h2 class="text-xl font-bold mb-4">Upcoming</h2>
+        <div class="flex flex-col gap-4">
+            {% for reminder in upcoming_reminders %}
+            <div class="flex items-center justify-between bg-[#f8fcfa] rounded-xl px-6 py-4 shadow-sm">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center justify-center rounded-lg bg-[#e6f4ef] size-12">
+                        <!-- Pill Icon -->
+                        <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M216.42,39.6a53.26,53.26,0,0,0-75.32,0L39.6,141.09a53.26,53.26,0,0,0,75.32,75.31h0L216.43,114.91A53.31,53.31,0,0,0,216.42,39.6ZM103.61,205.09h0a37.26,37.26,0,0,1-52.7-52.69L96,107.31,148.7,160ZM205.11,103.6,160,148.69,107.32,96l45.1-45.09a37.26,37.26,0,0,1,52.69,52.69ZM189.68,82.34a8,8,0,0,1,0,11.32l-24,24a8,8,0,1,1-11.31-11.32l24-24A8,8,0,0,1,189.68,82.34Z"></path></svg>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="font-bold text-lg">{{ reminder.medication.name }}</span>
+                        <span class="text-[#46a080] text-base">{{ reminder.time }}</span>
+                    </div>
+                </div>
+                <label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-[#e6f4ef] p-0.5 has-[:checked]:justify-end has-[:checked]:bg-[#019863]">
+                    <div class="h-full w-[27px] rounded-full bg-white" style="box-shadow: rgba(0, 0, 0, 0.15) 0px 3px 8px, rgba(0, 0, 0, 0.06) 0px 3px 1px;"></div>
+                    <input type="checkbox" class="invisible absolute" {% if reminder.taken %}checked{% endif %} />
+                </label>
+            </div>
+            {% empty %}
+            <div class="text-gray-400">No upcoming reminders.</div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="mb-8">
+        <h2 class="text-xl font-bold mb-4">Missed</h2>
+        <div class="flex flex-col gap-4">
+            {% for reminder in missed_reminders %}
+            <div class="flex items-center justify-between bg-[#f8fcfa] rounded-xl px-6 py-4 shadow-sm">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center justify-center rounded-lg bg-[#e6f4ef] size-12">
+                        <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M216.42,39.6a53.26,53.26,0,0,0-75.32,0L39.6,141.09a53.26,53.26,0,0,0,75.32,75.31h0L216.43,114.91A53.31,53.31,0,0,0,216.42,39.6ZM103.61,205.09h0a37.26,37.26,0,0,1-52.7-52.69L96,107.31,148.7,160ZM205.11,103.6,160,148.69,107.32,96l45.1-45.09a37.26,37.26,0,0,1,52.69,52.69ZM189.68,82.34a8,8,0,0,1,0,11.32l-24,24a8,8,0,1,1-11.31-11.32l24-24A8,8,0,0,1,189.68,82.34Z"></path></svg>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="font-bold text-lg">{{ reminder.medication.name }}</span>
+                        <span class="text-[#46a080] text-base">{{ reminder.time }}</span>
+                    </div>
+                </div>
+                <span class="text-[#46a080] text-base font-medium">Missed</span>
+            </div>
+            {% empty %}
+            <div class="text-gray-400">No missed reminders.</div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="mb-8">
+        <h2 class="text-xl font-bold mb-4">Alert Settings</h2>
+        <form class="flex flex-col gap-6 max-w-lg">
+            <div>
+                <label class="block font-medium mb-2">Alert Sound</label>
+                <select class="form-input w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-[#0c1c17] focus:outline-0 focus:ring-0 border border-[#cde9df] bg-[#f8fcfa] focus:border-[#cde9df] h-14 placeholder:text-[#46a080] p-[15px] text-base font-normal leading-normal">
+                    <option value="">Select sound</option>
+                    <option value="one">Sound 1</option>
+                    <option value="two">Sound 2</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-medium mb-2">Alert Frequency</label>
+                <select class="form-input w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-[#0c1c17] focus:outline-0 focus:ring-0 border border-[#cde9df] bg-[#f8fcfa] focus:border-[#cde9df] h-14 placeholder:text-[#46a080] p-[15px] text-base font-normal leading-normal">
+                    <option value="">Select frequency</option>
+                    <option value="one">Once</option>
+                    <option value="two">Twice</option>
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\service-worker.js =====
+
+self.addEventListener('install', function(event) {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function(event) {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', function(event) {
+  event.respondWith(
+    caches.match(event.request).then(function(response) {
+      return response || fetch(event.request);
+    })
+  );
+});
+
+// Placeholder for push notifications
+self.addEventListener('push', function(event) {
+  const data = event.data ? event.data.text() : 'MedReminder Notification';
+  event.waitUntil(
+    self.registration.showNotification('MedReminder', {
+      body: data,
+      icon: '/static/icons/icon-192x192.png'
+    })
+  );
+}); 
+
+
+===== FILE: MedReminder\templates\sos.html =====
+
+{% extends 'base.html' %}
+{% block title %}SOS{% endblock %}
+{% block content %}
+<div class="card max-w-4xl mx-auto text-center">
+    <h1 class="text-[32px] font-bold mb-6">SOS</h1>
+    <p class="mb-4">If you are experiencing a medical emergency, please contact your caregiver or emergency services immediately.</p>
+    <a href="tel:911" class="btn btn-danger">Call Emergency</a>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\registration\login.html =====
+
+{% extends 'base.html' %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="card max-w-md mx-auto">
+    <h1 class="text-[28px] font-bold mb-4">Login</h1>
+    <form method="post" class="flex flex-col gap-2">
+        {% csrf_token %}
+        {% for field in form %}
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<small class="text-[#46a080]">{{ field.help_text }}</small>{% endif %}
+            {% for error in field.errors %}<div class="text-red-600">{{ error }}</div>{% endfor %}
+        {% endfor %}
+        <div class="flex gap-2 mt-4">
+            <button type="submit" class="button">Login</button>
+            <a href="{% url 'register' %}" class="button" style="background: #e6f4ef; color: #0c1c17;">Register</a>
+        </div>
+    </form>
+</div>
+{% endblock %} 
+
+
+===== FILE: MedReminder\templates\registration\register.html =====
+
+{% extends 'base.html' %}
+{% block title %}Register{% endblock %}
+{% block content %}
+<div class="card max-w-md mx-auto">
+    <h1 class="text-[28px] font-bold mb-4">Register</h1>
+    <form method="post" class="flex flex-col gap-2">
+        {% csrf_token %}
+        {% for field in form %}
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<small class="text-[#46a080]">{{ field.help_text }}</small>{% endif %}
+            {% for error in field.errors %}<div class="text-red-600">{{ error }}</div>{% endfor %}
+        {% endfor %}
+        <div class="flex gap-2 mt-4">
+            <button type="submit" class="button">Register</button>
+            <a href="{% url 'login' %}" class="button" style="background: #e6f4ef; color: #0c1c17;">Login</a>
+        </div>
+    </form>
+</div>
+{% endblock %} 

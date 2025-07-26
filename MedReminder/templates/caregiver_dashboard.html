@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Caregiver Dashboard{% endblock %}
+{% block content %}
+<h1 class="text-[32px] font-bold mb-6">Caregiver Dashboard</h1>
+<div class="flex flex-col gap-4">
+    <div class="card">
+        <h2 class="text-lg font-bold mb-2">Patients</h2>
+        <ul>
+            {% for patient in patients %}
+            <li>{{ patient.get_full_name|default:patient.username }}</li>
+            {% empty %}
+            <li>No patients assigned.</li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="card">
+        <h2 class="text-lg font-bold mb-2">Recent Activity</h2>
+        <ul>
+            {% for activity in recent_activity %}
+            <li>{{ activity }}</li>
+            {% empty %}
+            <li>No recent activity.</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,60 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MedReminder{% endblock %}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Noto+Sans:wght@400;500;700;900&display=swap">
+    <link rel="stylesheet" href="{% static 'theme.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="flex">
+    <aside class="sidebar">
+        <div class="flex flex-col gap-4">
+            <div class="flex gap-3 align-center">
+                <div class="rounded-full size-10" style="background: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCFFiItAPq2JhudhqbK3KB0n_UOMyrKTdW0dIjQElVrYP2fSFUB9aV9vhWhO_LolI00p2YDIw-4MXt9nwQxw53iFP4EUHSKCwTRGQm4c8rhPP2a4D9FWBeze1XppBT7non6CJZocanad5AZNWM9nf70ZVXZ4_DJuRsCXQwh_jxhxiwZc3qgE5tP3Kb2aydLnaDP7Y4MPpNdH-naDArVeoikjP13v7QO_A_6EACTCO5lNkbdEmAM1jdyV-LNKhB-HsOG2Xe8Envoui30') center/cover no-repeat;"></div>
+                <h1 class="text-base font-medium">{{ user.get_full_name|default:user.username }}</h1>
+            </div>
+            <nav class="flex flex-col gap-2">
+                <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">
+                    <!-- Home Icon -->
+                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M218.83,103.77l-80-75.48a1.14,1.14,0,0,1-.11-.11,16,16,0,0,0-21.53,0l-.11.11L37.17,103.77A16,16,0,0,0,32,115.55V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V160h32v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V115.55A16,16,0,0,0,218.83,103.77ZM208,208H160V160a16,16,0,0,0-16-16H112a16,16,0,0,0-16,16v48H48V115.55l.11-.1L128,40l79.9,75.43.11.1Z"></path></svg>
+                    Home
+                </a>
+                <a href="{% url 'meds:meds_list' %}" class="nav-link {% if 'meds' in request.path %}active{% endif %}">
+                    <!-- Pill Icon -->
+                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M216.42,39.6a53.26,53.26,0,0,0-75.32,0L39.6,141.09a53.26,53.26,0,0,0,75.32,75.31h0L216.43,114.91A53.31,53.31,0,0,0,216.42,39.6ZM103.61,205.09h0a37.26,37.26,0,0,1-52.7-52.69L96,107.31,148.7,160ZM205.11,103.6,160,148.69,107.32,96l45.1-45.09a37.26,37.26,0,0,1,52.69,52.69ZM189.68,82.34a8,8,0,0,1,0,11.32l-24,24a8,8,0,1,1-11.31-11.32l24-24A8,8,0,0,1,189.68,82.34Z"></path></svg>
+                    Medications
+                </a>
+                <!-- Reminders nav link removed or updated -->
+                <a href="{% url 'reports:list' %}" class="nav-link {% if 'reports' in request.path %}active{% endif %}">
+                    <!-- Reports Icon -->
+                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M216,40H136V24a8,8,0,0,0-16,0V40H40A16,16,0,0,0,24,56V176a16,16,0,0,0,16,16H79.36L57.75,219a8,8,0,0,0,12.5,10l29.59-37h56.32l29.59,37a8,8,0,1,0,12.5-10l-21.61-27H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,136H40V56H216V176ZM104,120v24a8,8,0,0,1-16,0V120a8,8,0,0,1,16,0Zm32-16v40a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm32-16v56a8,8,0,0,1-16,0V88a8,8,0,0,1,16,0Z"></path></svg>
+                    Reports
+                </a>
+                <a href="{% url 'settings' %}" class="nav-link {% if 'settings' in request.path %}active{% endif %}">
+                    <!-- Settings Icon -->
+                    <svg width="24" height="24" fill="currentColor" viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Zm88-29.84q.06-2.16,0-4.32l14.92-18.64a8,8,0,0,0,1.48-7.06,107.21,107.21,0,0,0-10.88-26.25,8,8,0,0,0-6-3.93l-23.72-2.64q-1.48-1.56-3-3L186,40.54a8,8,0,0,0-3.94-6,107.71,107.71,0,0,0-26.25-10.87,8,8,0,0,0-7.06,1.49L130.16,40Q128,40,125.84,40L107.2,25.11a8,8,0,0,0-7.06-1.48A107.6,107.6,0,0,0,73.89,34.51a8,8,0,0,0-3.93,6L67.32,64.27q-1.56,1.49-3,3L40.54,70a8,8,0,0,0-6,3.94,107.71,107.71,0,0,0-10.87,26.25,8,8,0,0,0,1.49,7.06L40,125.84Q40,128,40,130.16L25.11,148.8a8,8,0,0,0-1.48,7.06,107.21,107.21,0,0,0,10.88,26.25,8,8,0,0,0,6,3.93l23.72,2.64q1.49,1.56,3,3L70,215.46a8,8,0,0,0,3.94,6,107.71,107.71,0,0,0,26.25,10.87,8,8,0,0,0,7.06-1.49L125.84,216q2.16.06,4.32,0l18.64,14.92a8,8,0,0,0,7.06,1.48,107.21,107.21,0,0,0,26.25-10.88,8,8,0,0,0,3.93-6l2.64-23.72q1.56-1.48,3-3L215.46,186a8,8,0,0,0,6-3.94,107.71,107.71,0,0,0,10.87-26.25,8,8,0,0,0-1.49-7.06Zm-16.1-6.5a73.93,73.93,0,0,1,0,8.68,8,8,0,0,0,1.74,5.48l14.19,17.73a91.57,91.57,0,0,1-6.23,15L187,173.11a8,8,0,0,0-5.1,2.64,74.11,74.11,0,0,1-6.14,6.14,8,8,0,0,0-2.64,5.1l-2.51,22.58a91.32,91.32,0,0,1-15,6.23l-17.74-14.19a8,8,0,0,0-5-1.75h-.48a73.93,73.93,0,0,1-8.68,0,8,8,0,0,0-5.48,1.74L100.45,215.8a91.57,91.57,0,0,1-15-6.23L82.89,187a8,8,0,0,0-2.64-5.1,74.11,74.11,0,0,1-6.14-6.14,8,8,0,0,0-5.1-2.64L46.43,170.6a91.32,91.32,0,0,1-6.23-15l14.19-17.74a8,8,0,0,0,1.74-5.48,73.93,73.93,0,0,1,0-8.68,8,8,0,0,0-1.74-5.48L40.2,100.45a91.57,91.57,0,0,1,6.23-15L69,82.89a8,8,0,0,0,5.1-2.64,74.11,74.11,0,0,1,6.14-6.14A8,8,0,0,0,82.89,69L85.4,46.43a91.32,91.32,0,0,1,15-6.23l17.74,14.19a8,8,0,0,0,5.48,1.74,73.93,73.93,0,0,1,8.68,0,8,8,0,0,0,5.48-1.74L155.55,40.2a91.57,91.57,0,0,1,15,6.23L173.11,69a8,8,0,0,0,2.64,5.1,74.11,74.11,0,0,1,6.14,6.14,8,8,0,0,0,5.1,2.64l22.58,2.51a91.32,91.32,0,0,1,6.23,15l-14.19,17.74A8,8,0,0,0,199.87,123.66Z"></path></svg>
+                    Settings
+                </a>
+            </nav>
+        </div>
+    </aside>
+    <main class="flex-1 max-w-4xl mx-auto p-8">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+{% block extra_body %}{% endblock %}
+
+<script>
+    // Define global variables for push subscription
+    const serviceWorkerPath = "{% static 'js/serviceworker.js' %}";
+    const vapidPublicKey = "{{ VAPID_PUBLIC_KEY }}";
+    const csrfToken = "{{ csrf_token }}";
+</script>
+<script src="{% static 'js/push-subscription.js' %}"></script>
+
+</body>
+</html>
